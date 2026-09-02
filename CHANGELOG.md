@@ -5,6 +5,27 @@ Todos los cambios notables en el proyecto Preoperacional se documentarán en est
 El formato está basado en [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 y este proyecto adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.3] — 2026-09-02
+
+### Seguridad — Ciclo completo de contraseñas (ADMIN y CONDUCTOR)
+
+Implementación según NIST SP 800-63B y OWASP ASVS v4:
+
+- **Política unificada de contraseñas** (`common/password-policy.ts`): 8–72 caracteres (límite real de bcrypt), lista de contraseñas comunes, secuencias de teclado/numéricas (≥4, normal y reversa), caracteres repetidos y datos personales (correo/cédula). Aplicada en crear, editar, cambiar y restablecer.
+- **Auto-cambio de contraseña** `POST /auth/change-password` (autenticado): exige la contraseña actual, rechaza reutilizarla, revoca todas las demás sesiones y re-emite refresh token. Disponible en panel (menú de perfil → "Cambiar contraseña" / ruta `/password`) y en la app de conductores (Perfil → "Cambiar contraseña" / `/cambiar-clave`).
+- **Restablecimiento por token de un solo uso**: nuevo modelo `PasswordReset` (solo se guarda el **SHA-256** del token, nunca el token plano), TTL 30 min, un solo uso, cuenta activa, nunca para SUPER_ROOT. Endpoints: `POST /auth/generate-reset` (ADMIN/SUPER_ROOT) y `POST /auth/reset-password` (público). UI: botón 🔑 en Usuarios → modal que muestra el token una sola vez con copiar al portapapeles; pantallas públicas `/reset-password` (panel) y `/restablecer` (app).
+- **Cambio obligatorio en primer inicio**: cuando un admin reasigna una contraseña (`PUT /users/:id`) o genera un token, se marca `must_change_password`; el login responde `mustChangePassword: true` y panel/app fuerzan la pantalla de cambio.
+- **Revocación de sesiones**: `password_changed_at` en `users`; el refresh rechaza sesiones emitidas antes de un cambio de contraseña; cambio/reset/admin-reasignación eliminan las sesiones previas.
+- **Refresh tokens hasheados**: `sessions.refresh_token` ahora almacena SHA-256 (un leak de BD ya no permite secuestrar sesiones).
+- **Anti-enumeración por timing en login**: cuando el correo no existe se ejecuta bcrypt contra un hash dummy (costo 12) para uniformar la latencia.
+- **Corregido**: incoherencia de política (crear exigía 6, login 8 → una contraseña de 6-7 chars no podía iniciar sesión). Ahora: crear/cambiar/restablecer exigen 8–72; el login acepta 6+ por compatibilidad con contraseñas legacy existentes en BD.
+- **Auditoría**: nuevas acciones `PASSWORD_CHANGED`, `PASSWORD_CHANGE_FAILED`, `PASSWORD_RESET`, `PASSWORD_RESET_USED`, `PASSWORD_RESET_TOKEN_GENERATED`.
+- **Rate limiting**: login 5/60s, reset-password 5/60s, change-password 5/60s, generate-reset 10/60s.
+
+### Verificación
+
+- Unit tests de la política (10/10), e2e backend (10/10), suite integral (50/50), flujo funcional completo por API (32/32) y flujo completo por UI real (CDP 14/14: cambio propio de admin, generación de token desde Usuarios, restablecimiento público, login con la nueva contraseña).
+
 ## [1.1.2] — 2026-09-02
 
 ### Corregido

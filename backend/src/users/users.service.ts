@@ -10,6 +10,10 @@ import { PrismaService } from '../prisma/prisma.service'
 import { CreateUserDto } from './dto/create-user.dto'
 import { UpdateUserDto } from './dto/update-user.dto'
 import type { CurrentUserData } from '../common/decorators/current-user.decorator'
+import {
+  passwordPolicyErrors,
+  passwordPolicyContextErrors,
+} from '../common/password-policy'
 
 const USER_INCLUDE = {
   admin: true,
@@ -82,6 +86,8 @@ export class UsersService {
       rol: user.role === 'DRIVER' ? 'CONDUCTOR' : user.role === 'SUPER_ROOT' ? 'SUPER_ROOT' : user.role,
       isActive: user.isActive,
       activo: user.isActive,
+      mustChangePassword: user.mustChangePassword ?? false,
+      passwordChangedAt: user.passwordChangedAt ?? null,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt ?? null,
       cedula: profile?.cedula ?? (user.role === 'SUPER_ROOT' ? '0000000000' : null),
@@ -128,6 +134,25 @@ export class UsersService {
     return this.prisma.user.findUnique({
       where: { email },
       include: USER_INCLUDE,
+    })
+  }
+
+  /** Devuelve el usuario completo (incl. password, flags) para autenticación. */
+  findByEmailForAuth(email: string) {
+    return this.prisma.user.findUnique({
+      where: { email },
+      include: USER_INCLUDE,
+    })
+  }
+
+  /** Devuelve el User "crudo" (sin incluir driver/admin) para flujos de credenciales. */
+  findRawById(id: number) {
+    return this.prisma.user.findUnique({
+      where: { id },
+      include: {
+        driver: { select: { cedula: true } },
+        admin: { select: { cedula: true } },
+      },
     })
   }
 
@@ -229,6 +254,15 @@ export class UsersService {
     await this.ensureEmailAvailable(dto.email)
     await this.ensureCedulaAvailable(dto.cedula)
 
+    // Política de contraseña unificada (8..72, sin banlist/secuencias/datos personales)
+    const policy = passwordPolicyErrors(dto.password) ?? passwordPolicyContextErrors(dto.password, {
+      email: dto.email,
+      cedula: dto.cedula,
+    })
+    if (policy) {
+      throw new BadRequestException(policy)
+    }
+
     const hashedPassword = await bcrypt.hash(dto.password, 12)
 
     const user = await this.prisma.user.create({
@@ -238,6 +272,8 @@ export class UsersService {
         password: hashedPassword,
         role,
         isActive: dto.isActive ?? true,
+        passwordChangedAt: new Date(),
+        mustChangePassword: false,
         admin:
           role === 'ADMIN'
             ? { create: this.buildAdminData(dto) }
@@ -295,6 +331,13 @@ export class UsersService {
 
     let hashedPassword: string | undefined
     if (dto.password) {
+      const policy = passwordPolicyErrors(dto.password) ?? passwordPolicyContextErrors(dto.password, {
+        email: dto.email ?? currentUser.email,
+        cedula: nextCedula,
+      })
+      if (policy) {
+        throw new BadRequestException(policy)
+      }
       hashedPassword = await bcrypt.hash(dto.password, 12)
     }
 
@@ -303,6 +346,15 @@ export class UsersService {
       ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
       ...(nextRole !== currentUser.role ? { role: nextRole } : {}),
       ...(hashedPassword ? { password: hashedPassword } : {}),
+    }
+
+    // Si un admin/SUPER_ROOT reasigna una contraseña, se exige el cambio en el
+    // primer inicio de sesión y se invalidan las sesiones previas del usuario.
+    let mustDeleteSessions = false
+    if (hashedPassword) {
+      data.passwordChangedAt = new Date()
+      data.mustChangePassword = caller?.id === id ? false : true
+      mustDeleteSessions = true
     }
 
     if (nextRole === 'SUPER_ROOT') {
@@ -338,6 +390,13 @@ export class UsersService {
       data,
       include: USER_INCLUDE,
     })
+
+    // Invalida todas las sesiones del usuario cuyo password cambió (el caller
+    // conserva la suya porque su access token sigue vigente; al expirar deberá
+    // reautenticarse con la nueva contraseña).
+    if (mustDeleteSessions) {
+      await this.prisma.session.deleteMany({ where: { userId: id } })
+    }
 
     return this.serializeUser(updated)
   }

@@ -122,6 +122,12 @@
                     <path d="M6.5 1.5v10M1.5 6.5h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
                   </svg>
                 </button>
+                <button class="rb-key" @click="askReset(u)" title="Restablecer contraseña (token de un solo uso)">
+                  <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                    <circle cx="4.5" cy="8.5" r="2.8" stroke="currentColor" stroke-width="1.3"/>
+                    <path d="M6.5 6.5L11 2M9 4l1.8 1.8M10.5 2.5l1.3 1.3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                </button>
                 <button class="rb-edit" @click="openEdit(u)" title="Editar usuario">
                   <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
                     <path d="M8.5 2L11 4.5L4 11.5H1.5v-2.5L8.5 2Z" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
@@ -253,9 +259,9 @@
                       :type="showPwd ? 'text' : 'password'"
                       class="ff-input"
                       :class="{'ff-input--err': ferr.password}"
-                      placeholder="Mínimo 6 caracteres"
+                      :placeholder="editing ? 'Dejar vacío para no cambiarla (mín. 8 si se edita)' : 'Mínimo 8 caracteres'"
                       autocomplete="new-password"
-                      @blur="ferr.password = mf.password.length > 0 && mf.password.length < 6"
+                      @blur="ferr.password = mf.password.length > 0 && mf.password.length < 8"
                       @input="ferr.password=false"
                     />
                     <button type="button" class="pwd-eye" @click="showPwd=!showPwd" tabindex="-1" :aria-label="showPwd?'Ocultar':'Mostrar'">
@@ -263,7 +269,7 @@
                       <svg v-else width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M1 1l13 13M5.5 5.6A2.2 2.2 0 0 0 9.4 9.5M3 3.5C1.8 4.7 1.1 6.1 1 7.5c.9 3 3.6 5 6.5 5 1.1 0 2.2-.3 3.1-.9M5.3 2.8C6 2.6 6.7 2.5 7.5 2.5c2.9 0 5.6 2 6.5 5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
                     </button>
                   </div>
-                  <p v-if="ferr.password" class="ff-err">Mínimo 6 caracteres</p>
+                  <p v-if="ferr.password" class="ff-err">Mínimo 8 caracteres</p>
                 </div>
 
                 <!-- TELÉFONO -->
@@ -500,6 +506,51 @@
       </Transition>
     </Teleport>
 
+    <!-- ════════════════════════════════════════════
+         MODAL: RESET DE CONTRASEÑA (TOKEN)
+    ════════════════════════════════════════════ -->
+    <Teleport to="body">
+      <Transition name="modal-t">
+        <div v-if="resetModal" class="modal-overlay" @click.self="closeReset">
+          <div class="modal-box modal-sm">
+            <template v-if="!resetToken">
+              <div class="del-icon">🔑</div>
+              <h3 class="del-title">Restablecer contraseña</h3>
+              <p class="del-body">
+                Se generará un <strong>token de un solo uso</strong> para
+                <strong>{{ resetTarget?.nombre }}</strong>. El usuario deberá ingresarlo
+                en la pantalla "Restablecer contraseña" para crear una nueva.<br/>
+                Válido por <strong>30 minutos</strong>.
+              </p>
+              <p v-if="resetError" class="modal-err">{{ resetError }}</p>
+              <div class="del-actions">
+                <button class="btn-cancel" @click="closeReset">Cancelar</button>
+                <button class="btn-save" :disabled="resetLoading" @click="generateReset">
+                  {{ resetLoading ? 'Generando…' : 'Generar token' }}
+                </button>
+              </div>
+            </template>
+            <template v-else>
+              <div class="del-icon">✅</div>
+              <h3 class="del-title">Token generado</h3>
+              <p class="del-body">
+                Entrega este token a <strong>{{ resetTarget?.nombre }}</strong>.
+                <strong>Se mostrará solo esta vez</strong> y expira a las
+                <strong>{{ resetExpires }}</strong>.
+              </p>
+              <div class="rt-token" @click="copyResetToken" title="Clic para copiar">{{ resetToken }}</div>
+              <p v-if="resetCopied" class="rt-copied">Copiado al portapapeles</p>
+              <p v-if="resetError" class="modal-err">{{ resetError }}</p>
+              <div class="del-actions">
+                <button class="btn-save" @click="copyResetToken">Copiar</button>
+                <button class="btn-cancel" @click="closeReset">Cerrar</button>
+              </div>
+            </template>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
   </div>
 </template>
 
@@ -593,6 +644,15 @@ const mError     = ref('')
 const toDelete   = ref<User | null>(null)
 const showPwd    = ref(false)
 const cityRef    = ref<HTMLElement | null>(null)
+
+// Reset de contraseña (token de un solo uso entregado por el admin)
+const resetModal   = ref(false)
+const resetTarget  = ref<User | null>(null)
+const resetLoading = ref(false)
+const resetError   = ref('')
+const resetToken   = ref('')
+const resetExpires = ref('')
+const resetCopied  = ref(false)
 
 // City autocomplete
 const cityQ    = ref('')
@@ -894,13 +954,57 @@ function askDelete(u: User) {
   delModal.value = true
 }
 
+/* ── Reset de contraseña ────────────────────────────── */
+function askReset(u: User) {
+  resetTarget.value = u
+  resetToken.value = ''
+  resetExpires.value = ''
+  resetError.value = ''
+  resetCopied.value = false
+  resetModal.value = true
+}
+
+function closeReset() {
+  resetModal.value = false
+  resetTarget.value = null
+}
+
+async function generateReset() {
+  if (!resetTarget.value || resetLoading.value) return
+  resetLoading.value = true
+  resetError.value = ''
+  try {
+    const res = await api.post<{ token: string; expiresAt: string }>('/auth/generate-reset', { userId: resetTarget.value.id })
+    resetToken.value = res.data.token
+    resetExpires.value = new Date(res.data.expiresAt).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })
+    await loadUsers()
+  } catch (e: any) {
+    const msg = e?.response?.data?.message
+    resetError.value = Array.isArray(msg) ? msg[0] : (msg || 'No fue posible generar el token.')
+  } finally {
+    resetLoading.value = false
+  }
+}
+
+async function copyResetToken() {
+  if (!resetToken.value) return
+  try {
+    await navigator.clipboard.writeText(resetToken.value)
+    resetCopied.value = true
+    setTimeout(() => { resetCopied.value = false }, 2000)
+  } catch {
+    resetError.value = 'No se pudo copiar automáticamente. Selecciónalo y copia manualmente.'
+  }
+}
+
 /* ── Validación completa ────────────────────────────── */
 function validateForm(): boolean {
   const errNombre   = !mf.nombre.trim()
   const errCedula   = !/^\d{6,12}$/.test(mf.cedula)
   const errEmail    = !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mf.email)
   const errTelefono  = mf.telefono.length === 0 || !/^[\d+\s\-()]+$/.test(mf.telefono)
-  const errPassword = !editing.value && mf.password.length < 6
+  const errPassword = mf.password.length > 0 && mf.password.length < 8
+  const errPasswordReq = !editing.value && mf.password.length < 8
   const isDriver = mf.rol === 'CONDUCTOR'
   const errPlaca    = isDriver && mf.placa.length > 0 && !/^[A-Z]{3}[\d]{3,4}$|^[A-Z]{3}-[\d]{3}$|^[A-Z0-9]{4,8}$/.test(mf.placa)
 
@@ -913,7 +1017,7 @@ function validateForm(): boolean {
     cedula:   errCedula,
     email:    errEmail,
     telefono: errTelefono,
-    password: errPassword,
+    password: errPassword || errPasswordReq,
     placa:    errPlaca,
     ciudad:   errCiudad,
     soatVigencia: errSoat,
@@ -923,7 +1027,7 @@ function validateForm(): boolean {
   if (errNombre)   { mError.value = 'El nombre completo es obligatorio.'; return false }
   if (errCedula)   { mError.value = 'La cédula debe tener entre 6 y 12 dígitos.'; return false }
   if (errEmail)    { mError.value = 'Ingresa un correo electrónico válido.'; return false }
-  if (errPassword) { mError.value = 'La contraseña debe tener mínimo 6 caracteres.'; return false }
+  if (errPassword) { mError.value = 'La contraseña debe tener mínimo 8 caracteres.'; return false }
   if (errPlaca)    { mError.value = 'El formato de placa no es válido (ej: ABC123).'; return false }
   if (errCiudad)   { mError.value = 'La ciudad es obligatoria.'; return false }
   if (errSoat)     { mError.value = 'La fecha de vencimiento del SOAT es obligatoria.'; return false }
@@ -1077,9 +1181,12 @@ onMounted(async () => {
 .sb-off { background:#f9fafb;color:#6b7280;border:1px solid #e5e7eb; }
 .sb-vac { background:#fffbeb;color:#92400e;border:1px solid #fde68a; }
 .row-btns { display:flex;gap:4px; }
-.rb-edit,.rb-del { width:28px;height:28px;border-radius:6px;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s; }
-.rb-edit { background:rgba(26,37,64,.07);color:#1a2540; } .rb-edit:hover { background:rgba(26,37,64,.14); }
+.rb-edit,.rb-del { width:28px;height:28px;border-radius:6px;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s; }.rb-edit { background:rgba(26,37,64,.07);color:#1a2540; } .rb-edit:hover { background:rgba(26,37,64,.14); }
 .rb-del  { background:rgba(230,61,47,.07);color:#e63d2f; } .rb-del:hover  { background:rgba(230,61,47,.14); }
+.rb-key  { width:28px;height:28px;border-radius:6px;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s;background:rgba(180,83,9,.08);color:#b45309; } .rb-key:hover { background:rgba(180,83,9,.16); }
+.rt-token { font-family:'Courier New',monospace;font-size:13px;letter-spacing:.5px;word-break:break-all;background:#0d1422;color:#7dd3fc;border-radius:8px;padding:12px 14px;cursor:pointer;user-select:all;margin:4px 0 2px;transition:opacity .15s; }
+.rt-token:hover { opacity:.88; }
+.rt-copied { font-size:12px;font-weight:700;color:#166534;margin:4px 0 0; }
 .rb-act  { background:rgba(22,101,52,.08);color:#166534; } .rb-act:hover  { background:rgba(22,101,52,.16); }
 
 /* ── Días laborales grid ───────────────────────────── */

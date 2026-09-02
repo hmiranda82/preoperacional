@@ -29,6 +29,14 @@
           <p class="lr-sub">Bienvenido al sistema de control de preoperacional</p>
         </div>
 
+        <!-- Success alert -->
+        <Transition name="err-t">
+          <div v-if="okMsg" class="lr-ok" role="status" aria-live="polite">
+            <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><circle cx="7.5" cy="7.5" r="6.5" fill="#22c55e"/><path d="M4.6 7.6l2 2.2 4-4.6" stroke="#fff" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            {{ okMsg }}
+          </div>
+        </Transition>
+
         <!-- Error alert -->
         <Transition name="err-t">
           <div v-if="errorMsg" class="lr-error" role="alert" aria-live="polite">
@@ -81,11 +89,10 @@
           <p v-if="vPass===false" class="lr-ferr">Mínimo 6 caracteres requeridos</p>
         </div>
 
-        <!-- Forgot link (comentado hasta implementar recuperación de contraseña)
+        <!-- Forgot link -->
         <div class="lr-forgot-row">
-          <button type="button" class="lr-forgot">¿Olvidaste tu contraseña?</button>
+          <router-link to="/reset-password" class="lr-forgot">¿Olvidaste tu contraseña?</router-link>
         </div>
-        -->
 
         <!-- Submit -->
         <button type="button" class="lr-submit" :disabled="loading" @click="tryLogin">
@@ -118,6 +125,7 @@ const email    = ref('')
 const password = ref('')
 const loading  = ref(false)
 const errorMsg = ref('')
+const okMsg    = ref('')
 
 // Leer mensaje de error que viene por query param desde el router
 // onMounted: captura el query param en la carga inicial
@@ -133,6 +141,11 @@ watch(() => route.query, () => {
 }, { immediate: false })
 
 function checkRouteError() {
+  if (route.query.reset === 'ok') {
+    okMsg.value = 'Contraseña restablecida. Inicia sesión con tu nueva contraseña.'
+    router.replace({ path: '/login' })
+    return
+  }
   if (route.query.error === 'sin_acceso') {
     errorMsg.value = 'Tu cuenta no tiene permisos para acceder al panel administrativo.'
     // Limpiar el query param de la URL para que no persista al recargar
@@ -169,11 +182,9 @@ async function tryLogin() {
     // Detectar SUPER_ROOT por dominio @system.local
     const isSuperRoot = email.value.endsWith('@system.local')
 
-    if (isSuperRoot) {
-      await auth.superLogin(email.value, password.value)
-    } else {
-      await auth.login(email.value, password.value)
-    }
+    const res: any = isSuperRoot
+      ? await auth.superLogin(email.value, password.value)
+      : await auth.login(email.value, password.value)
 
     // ADMIN y SUPER_ROOT pueden acceder al panel
     if (auth.user?.rol !== 'ADMIN' && auth.user?.rol !== 'SUPER_ROOT') {
@@ -181,6 +192,12 @@ async function tryLogin() {
       vEmail.value = false
       vPass.value = false
       errorMsg.value = 'Esta aplicación es solo para administradores. Los conductores deben usar la app de conductores.'
+      return
+    }
+
+    // Contraseña temporal asignada por un admin → forzar cambio antes de continuar
+    if (res?.mustChangePassword) {
+      router.push('/password?forzado=1')
       return
     }
 
@@ -268,6 +285,12 @@ async function tryLogin() {
   background:#fef2f2;border:1px solid #fecaca;
   border-radius:8px;padding:11px 14px;
   font-size:13.5px;color:#dc2626;font-weight:500;margin-bottom:22px;
+}
+.lr-ok {
+  display:flex;align-items:center;gap:9px;
+  background:#f0fdf4;border:1px solid #bbf7d0;
+  border-radius:8px;padding:11px 14px;
+  font-size:13.5px;color:#166534;font-weight:600;margin-bottom:22px;
 }
 .err-t-enter-active { animation:errSlide .3s cubic-bezier(.22,1,.36,1); }
 @keyframes errSlide { from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)} }

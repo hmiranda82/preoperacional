@@ -10,6 +10,8 @@ const router = createRouter({
   routes: [
     { path: '/',             redirect: '/inspeccionar' },
     { path: '/login',        component: () => import('../views/LoginView.vue'),      meta: { guestOnly: true } },
+    { path: '/restablecer',  component: () => import('../views/RestablecerView.vue'), meta: { guestOnly: true } },
+    { path: '/cambiar-clave', component: () => import('../views/CambiarClaveView.vue'), meta: { requiresAuth: true } },
     { path: '/inspeccionar', component: () => import('../views/FormularioView.vue'), meta: { requiresAuth: true } },
     { path: '/historial',    component: () => import('../views/HistorialView.vue'),  meta: { requiresAuth: true } },
     { path: '/perfil',       component: () => import('../views/PerfilView.vue'),     meta: { requiresAuth: true } },

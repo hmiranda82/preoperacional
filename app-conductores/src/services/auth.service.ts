@@ -10,6 +10,7 @@ export interface LoginResponse {
   access_token: string
   refresh_token: string
   user: AuthUser
+  mustChangePassword?: boolean
 }
 
 export async function loginRequest(payload: LoginRequest): Promise<LoginResponse> {

@@ -4,7 +4,12 @@ import { Throttle } from '@nestjs/throttler'
 import { AuthService } from './auth.service'
 import { LoginDto } from './dto/login.dto'
 import { RefreshDto } from './dto/refresh.dto'
+import { ChangePasswordDto } from './dto/change-password.dto'
+import { ResetPasswordDto } from './dto/reset-password.dto'
+import { GenerateResetDto } from './dto/generate-reset.dto'
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
+import { RolesGuard } from '../common/guards/roles.guard'
+import { Roles } from '../common/decorators/roles.decorator'
 import { CurrentUser } from '../common/decorators/current-user.decorator'
 import type { CurrentUserData } from '../common/decorators/current-user.decorator'
 
@@ -31,6 +36,33 @@ export class AuthController {
   @Throttle({ default: { limit: 10, ttl: 60000 } })
   refresh(@Body() body: RefreshDto) {
     return this.authService.refreshToken(body.refresh_token)
+  }
+
+  @Post('change-password')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard)
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  changePassword(
+    @Body() dto: ChangePasswordDto,
+    @CurrentUser() user: CurrentUserData,
+  ) {
+    return this.authService.changePassword(user.id, dto.current_password, dto.new_password)
+  }
+
+  @Post('reset-password')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  resetPassword(@Body() dto: ResetPasswordDto) {
+    return this.authService.resetPassword(dto.token, dto.new_password)
+  }
+
+  @Post('generate-reset')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN', 'SUPER_ROOT')
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  generateReset(@Body() dto: GenerateResetDto, @CurrentUser() user: CurrentUserData) {
+    return this.authService.generatePasswordResetToken(dto.userId, { id: user.id, role: user.role })
   }
 
   @Post('logout-all')

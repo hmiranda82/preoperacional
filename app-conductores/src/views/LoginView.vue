@@ -144,6 +144,11 @@
         </span>
       </button>
 
+      <!-- Olvidé mi contraseña -->
+      <button type="button" class="lc-forgot" @click="router.push('/restablecer')">
+        ¿Olvidaste tu contraseña?
+      </button>
+
     </div>
 
     <!-- Footer de seguridad -->
@@ -247,6 +252,12 @@ async function tryLogin() {
       auth.logout()
       errorMsg.value = 'Esta aplicación es solo para conductores. Los administradores deben usar el panel web.'
       vPass.value = null
+      return
+    }
+
+    // Contraseña temporal asignada por un admin → forzar cambio antes de continuar
+    if (auth.mustChangePassword) {
+      router.push('/cambiar-clave?forzado=1')
       return
     }
 
@@ -410,6 +421,16 @@ async function tryLogin() {
 .lc-btn:hover:not(:disabled) { background: #0d1422; transform: translateY(-1px); }
 .lc-btn:active:not(:disabled) { transform: translateY(0); }
 .lc-btn:disabled { opacity: .65; cursor: not-allowed; }
+
+.lc-forgot {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  width: 100%; margin: 2px 0 6px;
+  background: none; border: none; cursor: pointer;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 13px; font-weight: 700; letter-spacing: 1px; color: #8892a4;
+  padding: 8px; transition: color .15s;
+}
+.lc-forgot:hover { color: #1a2540; text-decoration: underline; text-underline-offset: 2px; }
 
 .btn-dots { display: flex; gap: 5px; align-items: center; }
 .btn-dots span {

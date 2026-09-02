@@ -59,7 +59,7 @@ export const useAuthStore = defineStore('auth', {
 
   actions: {
     async login(email: string, password: string) {
-      const res = await api.post<{ access_token: string; refresh_token: string; user: AuthUser }>(
+      const res = await api.post<{ access_token: string; refresh_token: string; user: AuthUser; mustChangePassword?: boolean }>(
         '/auth/login',
         { email, password },
       )
@@ -68,10 +68,16 @@ export const useAuthStore = defineStore('auth', {
       this.user = res.data.user
       sessionStorage.setItem('token', this.token)
       sessionStorage.setItem('refresh_token', this.refreshToken)
+      if (res.data.mustChangePassword) {
+        sessionStorage.setItem('must_change_password', 'true')
+      } else {
+        sessionStorage.removeItem('must_change_password')
+      }
+      return res.data
     },
 
     async superLogin(email: string, password: string) {
-      const res = await api.post<{ access_token: string; refresh_token: string; user: AuthUser }>(
+      const res = await api.post<{ access_token: string; refresh_token: string; user: AuthUser; mustChangePassword?: boolean }>(
         '/auth/super-login',
         { email, password },
       )
@@ -80,6 +86,12 @@ export const useAuthStore = defineStore('auth', {
       this.user = res.data.user
       sessionStorage.setItem('token', this.token)
       sessionStorage.setItem('refresh_token', this.refreshToken)
+      if (res.data.mustChangePassword) {
+        sessionStorage.setItem('must_change_password', 'true')
+      } else {
+        sessionStorage.removeItem('must_change_password')
+      }
+      return res.data
     },
 
     setUser(user: AuthUser) {

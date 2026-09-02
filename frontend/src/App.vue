@@ -96,6 +96,10 @@ async function logout() {
   loading.value = false
   router.push('/login')
 }
+function goPassword() {
+  profileOpen.value = false
+  router.push('/password')
+}
 function closeProfile(e: MouseEvent) {
   if (profileRef.value && !profileRef.value.contains(e.target as Node)) profileOpen.value=false
 }
@@ -320,6 +324,10 @@ const logoSrc = new URL('@/assets/logo.png', import.meta.url).href
                 </div>
                 <div class="pd-sep"></div>
                 <div class="pd-menu">
+                  <button class="pd-item" @click="goPassword">
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="2.5" y="6" width="9" height="6.5" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M4.5 6V4.5a2.5 2.5 0 0 1 5 0V6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="7" cy="9.3" r="1" fill="currentColor"/></svg>
+                    Cambiar contraseña
+                  </button>
                   <button class="pd-item pd-logout" @click="logout">
                     <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M5 12H3a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1h2M9 10l3-3-3-3M6 7h6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
                     Cerrar sesión

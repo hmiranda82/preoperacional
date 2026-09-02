@@ -8,6 +8,8 @@ const router = createRouter({
   routes: [
     { path:'/', redirect:'/dashboard' },
     { path:'/login',          component:()=>import('../views/LoginView.vue'),         meta:{guestOnly:true,   title:'Iniciar sesión'} },
+    { path:'/reset-password', component:()=>import('../views/ResetPasswordView.vue'), meta:{guestOnly:true,   title:'Restablecer contraseña'} },
+    { path:'/password',       component:()=>import('../views/PasswordView.vue'),      meta:{requiresAuth:true, title:'Cambiar contraseña'} },
     { path:'/dashboard',      component:()=>import('../views/DashboardView.vue'),     meta:{requiresAuth:true, title:'Dashboard'} },
     { path:'/responses',      component:()=>import('../views/ResponsesView.vue'),     meta:{requiresAuth:true, title:'Respuestas'} },
     { path:'/reports',        component:()=>import('../views/ReportView.vue'),       meta:{requiresAuth:true, title:'Reportes'} },

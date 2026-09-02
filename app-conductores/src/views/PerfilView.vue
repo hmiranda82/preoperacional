@@ -62,6 +62,18 @@
         </div>
       </div>
 
+      <!-- Seguridad -->
+      <div class="data-card">
+        <p class="dc-section">SEGURIDAD</p>
+        <div class="dc-row">
+          <span class="dc-label">CONTRASEÑA</span>
+          <span class="dc-val small muted">••••••••</span>
+        </div>
+        <button class="btn-cambiar" type="button" @click="router.push('/cambiar-clave')">
+          Cambiar contraseña
+        </button>
+      </div>
+
       <!-- Logout se maneja desde la pestaña Salir de la barra inferior -->
 
     </div>
@@ -140,7 +152,9 @@ const initiales = computed(() =>
 .logout-tip strong { color: #1a2540; }
 .logout-tip svg { flex-shrink: 0; }
 .server-url { font-size:11px;color:#8892a4;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
-.btn-cambiar { font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:1px;color:#e63d2f;background:none;border:none;cursor:pointer;padding:8px 0 0;display:block;width:100%;text-align:left; }
+.btn-cambiar { font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:800;letter-spacing:1.2px;color:#fff;background:#1a2540;border:none;border-radius:7px;cursor:pointer;padding:11px 16px;display:block;width:100%;text-align:center;margin-top:10px;transition:background .15s;box-shadow:0 3px 12px rgba(26,37,64,.22); }
+.btn-cambiar:hover { background:#0d1422; }
+.muted { color:#8892a4;letter-spacing:2px; }
 .url-edit { margin-top:10px;display:flex;flex-wrap:wrap;gap:6px; }
 .url-input { flex:1;min-width:140px;padding:8px 10px;border:1px solid #d0d8e8;border-radius:6px;font-size:16px;font-family:'Barlow',sans-serif;color:#1a2540;outline:none; }
 .url-input:focus { border-color:#1a2540; }

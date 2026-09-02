@@ -8,12 +8,14 @@ interface AuthState {
   token: string
   refreshToken: string
   user: AuthUser | null
+  mustChangePassword: boolean
 }
 
 function clearPersistedSession(): void {
   removeStorageItem(AUTH_STORAGE_KEYS.token)
   removeStorageItem(AUTH_STORAGE_KEYS.refreshToken)
   removeStorageItem(AUTH_STORAGE_KEYS.user)
+  removeStorageItem(AUTH_STORAGE_KEYS.mustChangePassword)
 }
 
 function persistSession(token: string, refreshToken: string, user: AuthUser | null): void {
@@ -33,6 +35,7 @@ export const useAuthStore = defineStore('auth', {
     token: getStorageItem(AUTH_STORAGE_KEYS.token),
     refreshToken: getStorageItem(AUTH_STORAGE_KEYS.refreshToken),
     user: getStorageJson<AuthUser>(AUTH_STORAGE_KEYS.user),
+    mustChangePassword: getStorageItem(AUTH_STORAGE_KEYS.mustChangePassword) === 'true',
   }),
 
   getters: {
@@ -58,6 +61,12 @@ export const useAuthStore = defineStore('auth', {
       this.token = session.access_token
       this.refreshToken = session.refresh_token
       this.user = session.user
+      this.mustChangePassword = session.mustChangePassword === true
+      if (this.mustChangePassword) {
+        setStorageItem(AUTH_STORAGE_KEYS.mustChangePassword, 'true')
+      } else {
+        removeStorageItem(AUTH_STORAGE_KEYS.mustChangePassword)
+      }
       persistSession(this.token, this.refreshToken, this.user)
     },
 
@@ -65,6 +74,7 @@ export const useAuthStore = defineStore('auth', {
       this.token = ''
       this.refreshToken = ''
       this.user = null
+      this.mustChangePassword = false
       clearPersistedSession()
     },
 
@@ -73,6 +83,15 @@ export const useAuthStore = defineStore('auth', {
       this.refreshToken = newRefreshToken
       setStorageItem(AUTH_STORAGE_KEYS.token, accessToken)
       setStorageItem(AUTH_STORAGE_KEYS.refreshToken, newRefreshToken)
+    },
+
+    setMustChangePassword(value: boolean): void {
+      this.mustChangePassword = value
+      if (value) {
+        setStorageItem(AUTH_STORAGE_KEYS.mustChangePassword, 'true')
+      } else {
+        removeStorageItem(AUTH_STORAGE_KEYS.mustChangePassword)
+      }
     },
   },
 })
