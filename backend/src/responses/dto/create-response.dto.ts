@@ -55,14 +55,6 @@ export class CreateResponseDto {
   contrato: string
 
   @IsOptional()
-  @IsNumber()
-  latitud?: number
-
-  @IsOptional()
-  @IsNumber()
-  longitud?: number
-
-  @IsOptional()
   @IsString()
   imagenVehiculoUrl?: string
 

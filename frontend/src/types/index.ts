@@ -68,8 +68,6 @@ export interface Response {
   ciudad: string;
   contrato: string;
   fecha: string;
-  latitud?: number | null;
-  longitud?: number | null;
   imagenVehiculoUrl?: string | null;
   /** Datos del conductor — serializado desde driver.nombre, driver.cedula, driver.user.email */
   user?: {

@@ -5,6 +5,20 @@ Todos los cambios notables en el proyecto Preoperacional se documentarán en est
 El formato está basado en [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 y este proyecto adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.1] — 2026-09-02
+
+### Base de datos (limpieza de esquema)
+
+- Revisión integral del esquema («15 tablas / 15 modelos») vs uso real en `backend`, `frontend` y `app-conductores`.
+- Eliminadas columnas funcionalmente muertas:
+  - `companies.subdomain`: nunca se lee para resolución de tenant (instalación single-tenant); campo solo se mostraba/editable en el panel de Empresas.
+  - `responses.latitud` / `responses.longitud`: el app-conductores nunca las envía y **0 de 106 respuestas** tenían valor; el backend solo las serializaba como `null`.
+- Limpieza en cascada de referencias: `create-response.dto`, `responses.service`, `update-company.dto`, `types/index.ts` (frontend) y `CompaniesView.vue` (placeholder, input, tipo y payload).
+- BD real aplicada con `prisma db push` (workflow del proyecto; no existe `_prisma_migrations`) + `prisma generate`.
+- Eliminadas 3 cuentas de prueba residuales `verif_*@preop.test` dejadas por corridas de `verify_full.ps1` (cascada completa). Línea base restaurada: users=12, responses=106, answers=1127.
+- Respaldo previo al cambio: `Base de Datos/preoperacional_db_preclean_2026-09-02.sql`.
+- Verificado: backend y frontend build OK, E2E 10/10, suite integral **50/50 PASS**, `uploads`=26, `/api/health` OK.
+
 ## [1.1.0] — 2026-09-02
 
 ### Seguridad

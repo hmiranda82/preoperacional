@@ -6,11 +6,6 @@ export class UpdateCompanyDto {
   @MaxLength(200)
   nombre?: string
 
-  @IsString()
-  @IsOptional()
-  @MaxLength(100)
-  subdomain?: string
-
   @IsBoolean()
   @IsOptional()
   activo?: boolean

@@ -20,7 +20,6 @@
           <tr>
             <th>#</th>
             <th>EMPRESA</th>
-            <th>SUBDOMINIO</th>
             <th>ESTADO</th>
             <th>CREADA</th>
             <th></th>
@@ -30,7 +29,6 @@
           <tr v-for="(c, i) in companies" :key="c.id" :style="{'--ri': i}">
             <td class="td-mono">{{ c.id }}</td>
             <td class="td-bold">{{ c.nombre }}</td>
-            <td class="td-mono">{{ c.subdomain || '—' }}</td>
             <td>
               <span class="sbadge" :class="c.activo ? 'sb-on' : 'sb-off'">
                 {{ c.activo ? 'ACTIVO' : 'INACTIVO' }}
@@ -64,10 +62,6 @@
             <div class="ff" style="margin-bottom:12px">
               <label class="ff-label">Nombre de la empresa <span class="req">*</span></label>
               <input v-model="nombre" class="ff-input" placeholder="Ej: Audifarma S.A.S" @keyup.enter="save" />
-            </div>
-            <div class="ff" style="margin-bottom:8px">
-              <label class="ff-label">Subdominio (opcional)</label>
-              <input v-model="subdomain" class="ff-input" placeholder="Ej: audifarma" @keyup.enter="save" />
             </div>
             <div class="ff" style="margin-bottom:16px">
               <label class="ff-check">
@@ -114,7 +108,7 @@ import { ref, onMounted } from 'vue'
 import api from '../api'
 
 interface Company {
-  id: number; nombre: string; subdomain?: string; activo: boolean; createdAt: string
+  id: number; nombre: string; activo: boolean; createdAt: string
 }
 
 const companies = ref<Company[]>([])
@@ -124,7 +118,6 @@ const editId = ref(0)
 const mSaving = ref(false)
 const mError = ref('')
 const nombre = ref('')
-const subdomain = ref('')
 const activo = ref(true)
 const delModal = ref(false)
 const deleting = ref(false)
@@ -142,7 +135,6 @@ async function load() {
 function openEdit(c: Company) {
   editId.value = c.id
   nombre.value = c.nombre
-  subdomain.value = c.subdomain || ''
   activo.value = c.activo
   mError.value = ''
   modalOpen.value = true
@@ -154,7 +146,7 @@ async function save() {
   if (!nombre.value.trim()) { mError.value = 'El nombre es obligatorio'; return }
   mSaving.value = true
   try {
-    const payload = { nombre: nombre.value.trim(), subdomain: subdomain.value.trim() || undefined, activo: activo.value }
+    const payload = { nombre: nombre.value.trim(), activo: activo.value }
     await api.put(`/companies/${editId.value}`, payload)
     closeModal()
     await load()

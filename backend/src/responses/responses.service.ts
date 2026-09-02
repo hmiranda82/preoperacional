@@ -65,8 +65,6 @@ export class ResponsesService {
     return {
       ...response,
       userId,
-      latitud:  response.latitud  != null ? Number(response.latitud)  : null,
-      longitud: response.longitud != null ? Number(response.longitud) : null,
       user: {
         id:     userId,
         email:  driver?.user?.email ?? null,
