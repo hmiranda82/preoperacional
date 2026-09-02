@@ -5,6 +5,13 @@ Todos los cambios notables en el proyecto Preoperacional se documentarán en est
 El formato está basado en [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 y este proyecto adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.2] — 2026-09-02
+
+### Corregido
+
+- Frontend: la vista **Usuarios** no renderizaba el listado ni permitía crear usuarios (conductor o administrativo). Causa: `ReferenceError: Cannot access 'filtered' before initialization` — el `watch(totalPages, ...)` evaluaba `totalPages` → `filtered` antes de su declaración en `<script setup>` (TDZ), tumbando todo el componente. Se reordenó el bloque de paginación (`totalPages`, `pageItems`, `watch`) para declararse después de `filtered`.
+- Verificado end-to-end en navegador real (CDP): login, listado con 8 conductores visible, creación de **CONDUCTOR** y **ADMIN** completadas por la UI sin errores de consola.
+
 ## [1.1.1] — 2026-09-02
 
 ### Base de datos (limpieza de esquema)

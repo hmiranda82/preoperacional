@@ -594,19 +594,6 @@ const toDelete   = ref<User | null>(null)
 const showPwd    = ref(false)
 const cityRef    = ref<HTMLElement | null>(null)
 
-// Paginación de la tabla
-const PAGE_SIZE = 20
-const page = ref(0)
-const totalPages = computed(() => Math.max(1, Math.ceil(filtered.value.length / PAGE_SIZE)))
-const pageItems  = computed(() =>
-  filtered.value.slice(page.value * PAGE_SIZE, (page.value + 1) * PAGE_SIZE)
-)
-
-// Al cambiar búsqueda o filtro de rol se regresa a la primera página
-watch([search, roleF], () => { page.value = 0 })
-// Si se borra/reactiva el último registro de la última página, se ajusta la página
-watch(totalPages, tp => { if (page.value > tp - 1) page.value = Math.max(0, tp - 1) })
-
 // City autocomplete
 const cityQ    = ref('')
 const cityOpen = ref(false)
@@ -725,6 +712,19 @@ const filtered = computed(() => {
     return match && (roleF.value === 'ALL' || u.rol === roleF.value)
   })
 })
+
+/* ── Paginación de la tabla (tras `filtered`) ──────────── */
+const PAGE_SIZE = 20
+const page = ref(0)
+const totalPages = computed(() => Math.max(1, Math.ceil(filtered.value.length / PAGE_SIZE)))
+const pageItems  = computed(() =>
+  filtered.value.slice(page.value * PAGE_SIZE, (page.value + 1) * PAGE_SIZE)
+)
+
+// Al cambiar búsqueda o filtro de rol se regresa a la primera página
+watch([search, roleF], () => { page.value = 0 })
+// Si se borra/reactiva el último registro de la última página, se ajusta la página
+watch(totalPages, tp => { if (page.value > tp - 1) page.value = Math.max(0, tp - 1) })
 
 /** Ciudades filtradas para el dropdown */
 const cityList = computed(() => {
