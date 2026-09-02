@@ -1,0 +1,25 @@
+module.exports = {
+  apps: [{
+    name: 'backend',
+    cwd: './backend',
+    script: './dist/main.js',
+    instances: 1,
+    exec_mode: 'fork',
+    max_memory_restart: '300M',
+    restart_delay: 5000,
+    max_restarts: 10,
+    exp_backoff_restart_delay: 100,
+    env: {
+      NODE_ENV: 'production',
+      PORT: 3458,
+    },
+    error_file: './logs/pm2-error.log',
+    out_file: './logs/pm2-out.log',
+    merge_logs: true,
+    log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+    autorestart: true,
+    watch: false,
+    kill_timeout: 5000,
+    listen_timeout: 10000,
+  }],
+}

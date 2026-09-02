@@ -1,0 +1,8 @@
+node_modules
+dist
+.env
+*.log
+ios
+release.keystore
+keystore.properties
+build-scripts/*.properties

@@ -1,0 +1,381 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl", "debian-openssl-3.0.x", "windows"]
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+//////////////////////////////
+// 🏢 EMPRESAS (MULTI-TENANT)
+//////////////////////////////
+
+model Company {
+  id        Int      @id @default(autoincrement())
+  nombre    String   @db.VarChar(200)
+  subdomain String?  @unique @db.VarChar(100)
+  activo    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime? @map("updated_at")
+
+  users     User[]
+  forms     Form[]
+  auditLogs AuditLog[]
+
+  @@map("companies")
+}
+
+//////////////////////////////
+// 🔐 USERS (IDENTIDAD)
+//////////////////////////////
+
+model User {
+  id        Int      @id @default(autoincrement())
+  companyId Int      @default(1) @map("company_id")
+  email     String   @unique @db.VarChar(120)
+  password  String   @db.VarChar(255)
+  role      UserRole
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime? @map("updated_at")
+
+  company  Company  @relation(fields: [companyId], references: [id])
+  driver    Driver?
+  admin     Admin?
+  sessions  Session[]
+  notificationReads NotificationRead[]
+
+  @@index([email], map: "idx_users_email")
+  @@index([role], map: "idx_users_role")
+  @@index([companyId], map: "idx_users_company")
+  @@index([isActive], map: "idx_users_active")
+  @@map("users")
+}
+
+//////////////////////////////
+// 🔑 SESSION (REFRESH TOKEN)
+//////////////////////////////
+
+model Session {
+  id           Int      @id @default(autoincrement())
+  userId       Int      @map("user_id")
+  refreshToken String   @unique @db.VarChar(500) @map("refresh_token")
+  createdAt    DateTime @default(now()) @map("created_at")
+  expiresAt    DateTime @map("expires_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId], map: "idx_sessions_user")
+  @@index([expiresAt], map: "idx_sessions_expires_at")
+  @@map("sessions")
+}
+
+//////////////////////////////
+// 🚗 DRIVER (APP)
+//////////////////////////////
+
+model Driver {
+  id            Int          @id @default(autoincrement())
+  userId        Int          @unique @map("user_id")
+  cedula        String       @unique @db.VarChar(50)
+  nombre        String       @db.VarChar(120)
+  telefono      String?      @db.VarChar(20)
+  placa         String?      @db.VarChar(20)
+  ciudad        String?      @db.VarChar(100)
+  soatVigencia  DateTime?    @db.Date @map("soat_vigencia")
+  tecniVigencia DateTime?    @db.Date @map("tecni_vigencia")
+  estado        DriverStatus @default(ACTIVO)
+  diasLaborales String       @default("1,2,3,4,5") @db.VarChar(20) @map("dias_laborales")
+  createdAt     DateTime     @default(now()) @map("created_at")
+  updatedAt     DateTime?    @updatedAt @map("updated_at")
+
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  responses Response[]
+  dailyStatuses DailyStatus[]
+  vacations Vacation[]
+  vacationDays VacationDay[]
+  ausencias Ausencia[]
+
+  @@index([userId], map: "idx_driver_user")
+  @@index([cedula], map: "idx_driver_cedula")
+  @@index([placa], map: "idx_driver_placa")
+  @@map("drivers")
+}
+
+////////////////////////////////
+// 🏖️ VACACIONES
+////////////////////////////////
+
+model Vacation {
+  id         Int       @id @default(autoincrement())
+  driverId   Int       @map("driver_id")
+  fechaInicio DateTime @db.Date @map("fecha_inicio")
+  fechaFin   DateTime  @db.Date @map("fecha_fin")
+  motivo     String?   @db.VarChar(255)
+  activo     Boolean   @default(true)
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime? @updatedAt @map("updated_at")
+
+  driver Driver @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  days   VacationDay[]
+
+  @@index([driverId], map: "idx_vacation_driver")
+  @@index([fechaInicio, fechaFin], map: "idx_vacation_dates")
+  @@map("vacations")
+}
+
+model VacationDay {
+  id         Int       @id @default(autoincrement())
+  vacationId Int       @map("vacation_id")
+  driverId   Int       @map("driver_id")
+  fecha      DateTime  @db.Date
+  activo     Boolean   @default(true)
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime? @updatedAt @map("updated_at")
+
+  vacation Vacation @relation(fields: [vacationId], references: [id], onDelete: Cascade)
+  driver   Driver   @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@unique([driverId, fecha], map: "uq_vacationday_driver_fecha")
+  @@index([vacationId], map: "idx_vacationday_vacation")
+  @@index([driverId], map: "idx_vacationday_driver")
+  @@index([fecha], map: "idx_vacationday_fecha")
+  @@map("vacation_days")
+}
+
+//////////////////////////////////////////
+// 📅 AUSENCIAS (DÍAS NO LABORALES PUNTUALES)
+//////////////////////////////////////////
+
+model Ausencia {
+  id        Int       @id @default(autoincrement())
+  driverId  Int       @map("driver_id")
+  fecha     DateTime  @db.Date
+  motivo    String?   @db.VarChar(255)
+  activo    Boolean   @default(true)
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime? @updatedAt @map("updated_at")
+
+  driver Driver @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@index([driverId], map: "idx_ausencia_driver")
+  @@index([fecha], map: "idx_ausencia_fecha")
+  @@unique([driverId, fecha], map: "uq_ausencia_driver_fecha")
+  @@map("ausencias")
+}
+
+//////////////////////////////
+// 👨‍💼 ADMIN (PANEL)
+//////////////////////////////
+
+model Admin {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @unique @map("user_id")
+  cedula    String   @unique @db.VarChar(50)
+  nombre    String   @db.VarChar(120)
+  telefono  String?  @db.VarChar(20)
+  ciudad    String?  @db.VarChar(100)
+  permisos  Json?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime? @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId], map: "idx_admin_user")
+  @@index([cedula], map: "idx_admin_cedula")
+  @@map("admins")
+}
+
+//////////////////////////////
+// 📋 FORMULARIOS
+//////////////////////////////
+
+model Form {
+  id        Int       @id @default(autoincrement())
+  companyId Int       @default(1) @map("company_id")
+  nombre    String    @db.VarChar(150)
+  activo    Boolean   @default(true)
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime? @map("updated_at")
+
+  company   Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  questions Question[]
+  responses Response[]
+
+  @@index([activo], map: "idx_forms_activo")
+  @@map("forms")
+}
+
+//////////////////////////////
+// ❓ PREGUNTAS
+//////////////////////////////
+
+model Question {
+  id        Int             @id @default(autoincrement())
+  formId    Int             @map("form_id")
+  texto     String          @db.Text
+  tipo      QuestionType
+  categoria VehicleCategory @default(TODOS)
+  orden     Int             @default(0)
+  activo    Boolean         @default(true)
+  createdAt DateTime        @default(now()) @map("created_at")
+
+  form    Form     @relation(fields: [formId], references: [id], onDelete: Cascade)
+  answers Answer[]
+
+  @@index([formId], map: "idx_questions_form")
+  @@index([orden], map: "idx_questions_orden")
+  @@map("questions")
+}
+
+//////////////////////////////
+// 📊 RESPUESTAS (SOLO DRIVER)
+//////////////////////////////
+
+model Response {
+  id                Int       @id @default(autoincrement())
+  driverId          Int       @map("driver_id") // 🔥 CORREGIDO
+  formId            Int       @map("form_id")
+  placa             String?   @db.VarChar(20)
+  ciudad            String?   @db.VarChar(100)
+  contrato          String?   @db.VarChar(100)
+  fecha             DateTime  @default(now())
+  latitud           Decimal?  @db.Decimal(10, 7)
+  longitud          Decimal?  @db.Decimal(10, 7)
+  imagenVehiculoUrl String?   @db.Text @map("imagen_vehiculo_url")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  
+
+  driver  Driver   @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  form    Form     @relation(fields: [formId], references: [id])
+  answers Answer[]
+  dailyStatus DailyStatus?
+
+  @@index([driverId], map: "idx_responses_driver")
+  @@index([formId], map: "idx_responses_form")
+  @@index([fecha], map: "idx_responses_fecha")
+  @@index([driverId, fecha], map: "idx_driver_fecha") // 🚀 performance
+  @@map("responses")
+}
+
+//////////////////////////////
+// 🧩 RESPUESTAS DETALLE
+//////////////////////////////
+
+model Answer {
+  id          Int      @id @default(autoincrement())
+  responseId  Int      @map("response_id")
+  questionId  Int      @map("question_id")
+  valor       String?  @db.Text
+  observacion String?  @db.Text
+  imagenUrl   String?  @db.Text @map("imagen_url")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  response Response @relation(fields: [responseId], references: [id], onDelete: Cascade)
+  question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([responseId, questionId], map: "uq_answer_response_question")
+  @@index([responseId], map: "idx_answers_response")
+  @@index([questionId], map: "idx_answers_question")
+  @@map("answers")
+}
+
+//////////////////////////////
+// 🧾 AUDITORÍA
+//////////////////////////////
+
+model AuditLog {
+  id        Int      @id @default(autoincrement())
+  companyId Int      @default(1) @map("company_id")
+  userId    Int?     @map("user_id")
+  action    String   @db.VarChar(100)
+  entity    String   @db.VarChar(100)
+  entityId  Int?     @map("entity_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  company   Company  @relation(fields: [companyId], references: [id])
+
+  @@index([companyId], map: "idx_audit_company")
+  @@index([userId], map: "idx_audit_logs_user")
+  @@index([entity, entityId], map: "idx_audit_logs_entity")
+  @@index([createdAt], map: "idx_audit_created_at")
+  @@map("audit_logs")
+}
+
+//////////////////////////////
+// 🔢 ENUMS
+//////////////////////////////
+
+enum UserRole {
+  ADMIN
+  DRIVER
+  SUPER_ROOT
+}
+
+enum DriverStatus {
+  ACTIVO
+  INACTIVO
+}
+
+enum QuestionType {
+  BOOLEAN @map("boolean")
+  SINO    @map("sino")
+  NUMERO  @map("numero")
+  TEXTO   @map("texto")
+}
+
+enum VehicleCategory {
+  TODOS
+  VEHICULO
+  MOTO
+  CONDUCTOR
+}
+
+//////////////////////////////
+// 📅 CUMPLIMIENTO DIARIO
+//////////////////////////////
+
+model DailyStatus {
+  id         Int               @id @default(autoincrement())
+  driverId   Int               @map("driver_id")
+  fecha      DateTime          @db.Date
+  estado     DailyStatusEstado @default(PENDIENTE)
+  responseId Int?              @unique @map("response_id")
+  createdAt  DateTime          @default(now()) @map("created_at")
+  updatedAt  DateTime?         @updatedAt @map("updated_at")
+
+  driver   Driver    @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  response Response? @relation(fields: [responseId], references: [id], onDelete: SetNull)
+
+  @@unique([driverId, fecha], map: "uq_driver_fecha")
+  @@index([fecha],    map: "idx_daily_fecha")
+  @@index([driverId], map: "idx_daily_driver")
+  @@index([estado],   map: "idx_daily_estado")
+  @@index([driverId, fecha, estado], map: "idx_daily_driver_fecha_estado")
+  @@map("daily_status")
+}
+
+enum DailyStatusEstado {
+  PENDIENTE
+  COMPLETADO
+  INCUMPLIDO
+}
+
+// //////////////////////////////
+// 🔔 LECTURA DE NOTIFICACIONES
+// //////////////////////////////
+
+model NotificationRead {
+  id             Int      @id @default(autoincrement())
+  userId         Int
+  notificationId String   @db.VarChar(50)
+  readAt         DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, notificationId])
+  @@index([userId], map: "idx_notif_read_user")
+  @@map("notification_reads")
+}

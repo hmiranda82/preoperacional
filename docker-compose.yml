@@ -1,0 +1,128 @@
+services:
+
+  # ── Red interna aislada ──
+  internal:
+    image: alpine:3
+    container_name: preoperacional-internal
+    command: ["sleep", "infinity"]
+    profiles: ["internal"]
+
+  db:
+    image: mysql:8.0
+    container_name: preoperacional-db
+    restart: unless-stopped
+    networks:
+      - internal
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: preoperacional_db
+      MYSQL_USER: preop_user
+      MYSQL_PASSWORD: ${MYSQL_APP_PASSWORD}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: preoperacional-api
+    restart: unless-stopped
+    networks:
+      - internal
+      - public
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: mysql://preop_user:${MYSQL_APP_PASSWORD}@db:3306/preoperacional_db
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES_IN: 1h
+      PORT: 3002
+      NODE_ENV: production
+      RUN_SEED: "false"
+      HOST: 0.0.0.0
+      API_URL: https://api.${DOMINIO}
+      CORS_ORIGINS: https://admin.${DOMINIO},https://localhost
+      LOG_LEVEL: info
+      SENTRY_DSN: ${SENTRY_DSN:-}
+    volumes:
+      - uploads:/app/uploads
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "http://localhost:3002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: https://api.${DOMINIO}
+    container_name: preoperacional-admin
+    restart: unless-stopped
+    networks:
+      - public
+    depends_on:
+      - backend
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "--tries=1", "http://localhost:80/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: preoperacional-caddy
+    restart: unless-stopped
+    networks:
+      - public
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    environment:
+      DOMINIO: ${DOMINIO}
+    depends_on:
+      - backend
+      - frontend
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+
+volumes:
+  mysql_data:
+  uploads:
+  caddy_data:
+  caddy_config:
+
+networks:
+  internal:
+    driver: bridge
+    internal: true
+  public:
+    driver: bridge

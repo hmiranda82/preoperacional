@@ -1,0 +1,36 @@
+# Dependencias y build
+node_modules
+dist
+coverage
+
+# Entornos y secretos — nunca subir
+.env
+.env.*
+!.env.example
+!**/.env.example
+*.pem
+*.key
+keystore.properties
+
+# Bases de datos y dumps (.sql)
+Base de Datos/
+*.sql
+*.sql.gz
+*.sql.zip
+
+# Respaldos y empaquetados sensibles
+*.zip
+*.7z
+*.rar
+*.tar.gz
+
+# Tokens/capturas fugadas
+login.json
+
+# Datos de la app (fotos de inspección) — no versionar
+uploads/
+
+# Logs y SO
+*.log
+thumbs.db
+.DS_Store

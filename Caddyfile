@@ -1,0 +1,26 @@
+{
+    email admin@{env.DOMINIO}
+    strict_sni
+}
+
+admin.{env.DOMINIO} {
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Frame-Options "DENY"
+        X-Content-Type-Options "nosniff"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        Permissions-Policy "camera=(), geolocation=(), microphone=()"
+    }
+    reverse_proxy frontend:80
+}
+
+api.{env.DOMINIO} {
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Frame-Options "DENY"
+        X-Content-Type-Options "nosniff"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        Permissions-Policy "camera=(), geolocation=(), microphone=()"
+    }
+    reverse_proxy backend:3002
+}

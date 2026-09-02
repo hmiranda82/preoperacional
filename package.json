@@ -1,0 +1,30 @@
+{
+  "name": "preoperacional-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev:backend": "pnpm --filter backend dev",
+    "dev:frontend": "pnpm --filter frontend dev",
+    "dev:app": "pnpm --filter app-conductores dev",
+    "build:backend": "pnpm --filter backend build",
+    "build:frontend": "pnpm --filter frontend build",
+    "build:app": "pnpm --filter app-conductores build",
+    "build": "pnpm -r build",
+    "lint": "pnpm -r lint",
+    "test": "pnpm --filter backend test",
+    "typecheck": "pnpm -r typecheck",
+    "prisma:generate": "pnpm --filter backend prisma:generate",
+    "prisma:migrate": "pnpm --filter backend prisma:migrate",
+    "seed": "pnpm --filter backend seed",
+    "generate-secrets": "node scripts/generate-secrets.mjs",
+    "backup": "bash scripts/backup.sh",
+    "security:audit": "pnpm audit --filter backend && pnpm audit --filter frontend && pnpm audit --filter app-conductores"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "devDependencies": {
+    "pm2": "^7.0.1"
+  }
+}

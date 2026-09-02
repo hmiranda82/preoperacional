@@ -1,0 +1,48 @@
+FROM node:20-slim AS build
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    openssl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN corepack enable && corepack prepare pnpm@latest --activate
+
+WORKDIR /app
+
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY backend/package.json backend/nest-cli.json backend/tsconfig.json ./backend/
+COPY backend/prisma ./backend/prisma
+
+RUN pnpm install --frozen-lockfile --filter backend
+
+RUN pnpm --filter backend exec prisma generate
+
+COPY backend/src ./backend/src
+
+RUN pnpm --filter backend build
+
+FROM node:20-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    openssl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN corepack enable && corepack prepare pnpm@latest --activate
+
+RUN groupadd -r appgroup && useradd -r -g appgroup -m -d /app appuser
+
+WORKDIR /app
+
+COPY --from=build /app/node_modules ./node_modules
+COPY --from=build /app/backend/dist ./dist
+COPY --from=build /app/backend/prisma ./prisma
+
+RUN mkdir -p /app/uploads && chown -R appuser:appgroup /app
+
+EXPOSE 3002
+
+COPY backend/docker-entrypoint.sh /app/docker-entrypoint.sh
+RUN chmod +x /app/docker-entrypoint.sh
+
+USER appuser
+
+ENTRYPOINT ["/app/docker-entrypoint.sh"]

@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" href="/favicon.ico" />
+
+    <!-- ── VIEWPORT FULL SCREEN ──
+         viewport-fit=cover: extiende el contenido bajo el notch/isla dinámica.
+         El CSS debe usar env(safe-area-inset-*) para proteger los controles. -->
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+
+    <!-- ── PWA MANIFEST ── -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700;800;900&family=Barlow+Condensed:wght@600;700;800&display=swap" rel="stylesheet">
+    <link rel="manifest" href="/manifest.webmanifest" />
+
+    <!-- ── THEME COLOR (barra de estado del navegador en Android) ── -->
+    <meta name="theme-color" content="#F2F3F4" />
+
+    <!-- ── iOS SAFARI FULLSCREEN ──
+         Permite que la app instalada corra sin la barra de Safari.
+         status-bar-style=black-translucent hace la barra transparente
+         para que nuestro fondo navy rellene el área del notch. -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Revisión" />
+
+    <!-- ── ANDROID CHROME standalone ── -->
+    <meta name="mobile-web-app-capable" content="yes" />
+
+    <title>Revisión</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
