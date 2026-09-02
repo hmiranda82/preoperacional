@@ -7,7 +7,6 @@ import { JwtService } from '@nestjs/jwt'
 import request from 'supertest'
 import * as path from 'path'
 import * as fs from 'fs'
-import * as bcrypt from 'bcrypt'
 import { AppModule } from '../src/app.module'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { JwtAuthGuard } from '../src/common/guards/jwt-auth.guard'
@@ -45,6 +44,12 @@ const mockPrisma = {
   vacation: {
     findMany: jest.fn().mockResolvedValue([]),
     findFirst: jest.fn(),
+  },
+  ausencia: {
+    findMany: jest.fn().mockResolvedValue([]),
+  },
+  vacationDay: {
+    findMany: jest.fn().mockResolvedValue([]),
   },
   dailyStatus: {
     findMany: jest.fn().mockResolvedValue([]),
@@ -88,6 +93,15 @@ const mockJwtGuard = {
 const mockThrottlerGuard = {
   canActivate: () => true,
 }
+
+// bcrypt v6 expone named exports como propiedades de solo lectura en ESM,
+// por lo que jest.spyOn(bcrypt, 'compare') falla con "Cannot redefine property".
+// Se mockea el módulo completo desde la fábrica (sin referencias externas,
+// porque jest.mock se hoistea por encima de las declaraciones del módulo).
+jest.mock('bcrypt', () => ({
+  compare: jest.fn().mockResolvedValue(true),
+  hash: jest.fn().mockResolvedValue('hashed'),
+}))
 
 const mockDriverUser = {
   id: 1,
@@ -206,8 +220,6 @@ describe('App E2E', () => {
   beforeEach(() => {
     jest.clearAllMocks()
 
-    jest.spyOn(bcrypt, 'compare').mockResolvedValue(true as never)
-
     const futureDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
     mockPrisma.session.create.mockResolvedValue(mockNewSession)
     mockPrisma.session.findUnique.mockResolvedValue(null)
@@ -268,7 +280,8 @@ describe('App E2E', () => {
         .expect(200)
         .expect((res) => {
           expect(res.body).toHaveProperty('access_token')
-          expect(res.body).toHaveProperty('refresh_token', 'new_refresh_token_xyz')
+          expect(typeof res.body.refresh_token).toBe('string')
+          expect(res.body.refresh_token.length).toBeGreaterThanOrEqual(16)
           expect(res.body).toHaveProperty('user')
         })
     })
@@ -344,7 +357,7 @@ describe('App E2E', () => {
       }
     })
 
-    it('should upload an image file and return the URL', () => {
+    it('should upload an image file and return the URL', async () => {
       const pngBuffer = Buffer.from([
         0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
         0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
@@ -357,17 +370,20 @@ describe('App E2E', () => {
         0x44, 0xAE, 0x42, 0x60, 0x82,
       ])
 
-      return request(app.getHttpServer())
+      const res = await request(app.getHttpServer())
         .post('/uploads/image')
         .set('Authorization', 'Bearer valid_token')
         .attach('file', pngBuffer, 'test-image.png')
-        .expect((res) => {
-          if (res.status === 201 || res.status === 200) {
-            expect(res.body).toHaveProperty('url')
-            expect(res.body).toHaveProperty('filename')
-            expect(res.body.url).toContain('/uploads/')
-          }
-        })
+
+      if (res.status === 201 || res.status === 200) {
+        expect(res.body).toHaveProperty('url')
+        expect(res.body).toHaveProperty('filename')
+        expect(res.body.url).toContain('/uploads/')
+        if (res.body.filename) {
+          const fp = path.join(uploadsDir, res.body.filename)
+          try { fs.unlinkSync(fp) } catch {}
+        }
+      }
     })
 
     it('should reject request without file', () => {

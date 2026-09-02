@@ -5,6 +5,28 @@ Todos los cambios notables en el proyecto Preoperacional se documentarán en est
 El formato está basado en [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 y este proyecto adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] — 2026-09-02
+
+### Seguridad
+
+- Auditoría de dependencias (`pnpm audit`): de **38 vulnerabilidades** (1 critical, 20 high, 16 moderate, 1 low) a **0 vulnerabilidades**.
+- `tar` (critical, DoS de descompresión) eliminado de producción moviendo `@capacitor/cli` a `devDependencies` en `app-conductores`.
+- `xlsx@0.18.5` (deprecado, sin fix en npm; prototype pollution + ReDoS) reemplazado por el build oficial parcheado `0.20.3` desde el CDN de SheetJS.
+- `axios` subido a `^1.18.0` en `frontend` y `app-conductores` (proxy inheritance + ReDoS + prototype pollution).
+- `exceljs` eliminado del backend (dependencia sin uso; arrastraba `uuid`/`tmp`/`brace-expansion` vulnerables). El frontend lo mantiene (exportación ejecutiva).
+- Overrides globales en `pnpm-workspace.yaml` (`body-parser`, `multer`, `dompurify`, `postcss`, `nanoid`, `tmp`, `uuid`, `brace-expansion×4`) para parchear dependencias transitivas.
+
+### Corregido
+
+- Backend: suite E2E (`test/app.e2e-spec.ts`) no ejecutable con `bcrypt@6` + `jest@30` (`Cannot redefine property: compare`); se mockea el módulo `bcrypt` desde la fábrica y se completan los mocks faltantes (`ausencia`, `vacationDay`). De 0 → **10/10 PASS**.
+- Backend: test E2E de uploads dejaba archivos huérfanos en `backend/uploads`; ahora se auto-limpia.
+- Suite integral de verificación (50 casos) confirmada **50/50 PASS** sobre el build final sin dejar residuos en `uploads`.
+
+### Cambiado
+
+- `app-conductores`: `@capacitor/cli` movido a `devDependencies`.
+- `backend/uploads`: restaurado a 26 archivos (línea base sin artefactos de pruebas).
+
 ## [1.0.0] — 2024-07-06
 
 ### Añadido

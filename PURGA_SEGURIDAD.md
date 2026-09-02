@@ -233,6 +233,15 @@ git log --all --name-only | Select-String "preoperacional_db|login.json|\.env$|\
 # 2) Dependencias sin vulnerabilidades conocidas
 #    backend / frontend / app-conductores:
 cmd /c "pnpm audit"
+```
+
+> **Estado 2026-09-02:** la auditoría del workspace pasó de **38 vulnerabilidades**
+> (incluida 1 crítico en `tar`) a **0**, mediante:
+> `@capacitor/cli` → `devDependencies`, `axios` → `^1.18.0`, `xlsx` → build
+> parcheado `0.20.3` (CDN SheetJS), `exceljs` eliminado del backend (sin uso) y
+> overrides en `pnpm-workspace.yaml` para `body-parser`, `multer`, `dompurify`,
+> `postcss`, `nanoid`, `tmp`, `uuid` y `brace-expansion`. La suite E2E del backend
+> también quedó funcional (10/10) y la suite integral de 50 casos pasa 50/50.
 
 # 3) El servidor usa los nuevos secretos y la app responde
 #    (health: debe dar 200 y "database":"connected")
