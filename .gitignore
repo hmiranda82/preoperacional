@@ -34,3 +34,7 @@ uploads/
 *.log
 thumbs.db
 .DS_Store
+
+# IDE
+.idea/
+*.iml
