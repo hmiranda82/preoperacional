@@ -1,7 +1,9 @@
+import { Injectable } from '@nestjs/common'
 import { Controller, Post, Body, HttpCode, HttpStatus, UseGuards } from '@nestjs/common'
 import { Throttle } from '@nestjs/throttler'
 import { AuthService } from './auth.service'
 import { LoginDto } from './dto/login.dto'
+import { RefreshDto } from './dto/refresh.dto'
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
 import { CurrentUser } from '../common/decorators/current-user.decorator'
 import type { CurrentUserData } from '../common/decorators/current-user.decorator'
@@ -27,7 +29,7 @@ export class AuthController {
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { limit: 10, ttl: 60000 } })
-  refresh(@Body() body: { refresh_token: string }) {
+  refresh(@Body() body: RefreshDto) {
     return this.authService.refreshToken(body.refresh_token)
   }
 
