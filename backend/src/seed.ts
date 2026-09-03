@@ -1,7 +1,68 @@
 import { PrismaClient } from '@prisma/client'
 import * as bcrypt from 'bcrypt'
+import * as fs from 'fs'
+import * as path from 'path'
+
+/**
+ * Carga liviana del archivo .env (backend/.env) en process.env cuando una variable
+ * aún no está definida. Evita depender de la librería dotenv para scripts CLI.
+ */
+function loadEnvFile(): void {
+  const envPath = path.resolve(__dirname, '..', '.env')
+  if (!fs.existsSync(envPath)) return
+  const lines = fs.readFileSync(envPath, 'utf-8').split('\n')
+  for (const line of lines) {
+    const trimmed = line.trim()
+    if (!trimmed || trimmed.startsWith('#')) continue
+    const eq = trimmed.indexOf('=')
+    if (eq <= 0) continue
+    const key = trimmed.slice(0, eq).trim()
+    let value = trimmed.slice(eq + 1).trim()
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1)
+    }
+    if (!(key in process.env)) {
+      process.env[key] = value
+    }
+  }
+}
+
+loadEnvFile()
 
 const prisma = new PrismaClient()
+
+/** Contraseña del ADMIN principal para posibilidades de bootstrap/seed. */
+function getAdminSeedPassword(): string {
+  const fromEnv = process.env.ADMIN_SEED_PASSWORD
+  if (fromEnv && fromEnv.length >= 8) return fromEnv
+  if ((process.env.NODE_ENV || 'development') === 'development') {
+    return 'admin123'
+  }
+  throw new Error(
+    'ADMIN_SEED_PASSWORD no está definida y NODE_ENV no es development.',
+  )
+}
+
+/** Contraseña de SUPER_ROOT para posibilidades de bootstrap/seed. */
+function getSuperRootPassword(): string {
+  // En producción/seeding se lee SIEMPRE de variable de entorno (nunca en claro en el código).
+  const fromEnv = process.env.SUPER_ROOT_PASSWORD
+  if (fromEnv && fromEnv.length >= 8) return fromEnv
+
+  // Fallback SOLO para entornos de desarrollo local, para que el seed funcione
+  // sin configurar la variable. Nunca se usa en producción.
+  if ((process.env.NODE_ENV || 'development') === 'development') {
+    return 'superRoot2024!'
+  }
+
+  throw new Error(
+    'SUPER_ROOT_PASSWORD no está definida y NODE_ENV no es development. ' +
+    'Defina esta variable de entorno antes de ejecutar el seed.',
+  )
+}
 
 async function main() {
   console.log('Iniciando seed...')
@@ -16,7 +77,7 @@ async function main() {
 
   // ── 1. ADMIN ─────────────────────────────────────────────
   const email    = 'admin@preoperacional.com'
-  const password = 'admin123'
+  const password = getAdminSeedPassword()
   const hash     = await bcrypt.hash(password, 12)
 
   const existing = await prisma.user.findUnique({
@@ -49,7 +110,7 @@ async function main() {
 
   // ── 1b. SUPER_ROOT ─────────────────────────────────────────
   const superEmail    = 'root@system.local'
-  const superPassword = 'superRoot2024!'
+  const superPassword = getSuperRootPassword()
   const superHash     = await bcrypt.hash(superPassword, 12)
 
   const superExisting = await prisma.user.findUnique({
@@ -69,7 +130,7 @@ async function main() {
     include: { admin: true },
   })
 
-  console.log(`✅ Super Root listo: ${superRoot.email} / ${superPassword}`)
+  console.log(`✅ Super Root listo: ${superRoot.email}`)
 
   // ── 2. FORMULARIO PREOPERACIONAL ─────────────────────────
   const formExiste = await prisma.form.findFirst({

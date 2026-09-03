@@ -720,8 +720,11 @@ const fleetUsers = computed(() =>
 
 const filteredUsers = computed(() => {
   const q = fleetSearch.value.toLowerCase().trim()
-  if (!q) return fleetUsers.value
-  return fleetUsers.value.filter(u =>
+  // Igual que en Usuarios: los conductores inactivos/desactivados se ocultan del
+  // listado (solo se vuelven a ver cuando se reactivan). 'activo===false' fuera.
+  const base = fleetUsers.value.filter(u => u.activo !== false)
+  if (!q) return base
+  return base.filter(u =>
     u.nombre.toLowerCase().includes(q) ||
     (u.placa  ?? '').toLowerCase().includes(q) ||
     u.cedula.toLowerCase().includes(q) ||
