@@ -84,7 +84,7 @@ export class ReportsService {
     driverId?: number
     usuario?: string
   }): Promise<ExecutiveReport> {
-    const { year, month, companyId, ciudad, supervisorId, tipoVehiculo, driverId, usuario } = params
+    const { year, month, companyId, ciudad, tipoVehiculo, driverId, usuario } = params
 
     // Build date range for the month
     const firstDay = new Date(year, month - 1, 1)

@@ -113,11 +113,6 @@ async function main() {
   const superPassword = getSuperRootPassword()
   const superHash     = await bcrypt.hash(superPassword, 12)
 
-  const superExisting = await prisma.user.findUnique({
-    where:   { email: superEmail },
-    include: { admin: true },
-  })
-
   const superRoot = await prisma.user.upsert({
     where:  { email: superEmail },
     update: {

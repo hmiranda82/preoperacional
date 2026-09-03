@@ -148,30 +148,6 @@ const mockAdminUser = {
   },
 }
 
-const mockOtherCompanyUser = {
-  id: 3,
-  companyId: 2,
-  email: 'other@test.com',
-  password: '$2b$12$hashedother789',
-  role: 'DRIVER',
-  isActive: true,
-  createdAt: new Date('2025-01-01'),
-  updatedAt: null,
-  driver: {
-    id: 30,
-    userId: 3,
-    cedula: '1111111111',
-    nombre: 'Other Driver',
-    telefono: '3003333333',
-    placa: 'XYZ999',
-    ciudad: 'Medellín',
-    soatVigencia: new Date('2026-01-01'),
-    tecniVigencia: new Date('2026-01-01'),
-    estado: 'ACTIVO',
-  },
-  admin: null,
-}
-
 const mockSession = {
   id: 1,
   userId: 1,
@@ -220,7 +196,6 @@ describe('App E2E', () => {
   beforeEach(() => {
     jest.clearAllMocks()
 
-    const futureDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
     mockPrisma.session.create.mockResolvedValue(mockNewSession)
     mockPrisma.session.findUnique.mockResolvedValue(null)
     mockPrisma.session.delete.mockResolvedValue(mockSession)
@@ -351,7 +326,7 @@ describe('App E2E', () => {
         files.forEach((f) => {
           const fp = path.join(uploadsDir, f)
           if (f.startsWith('test-')) {
-            try { fs.unlinkSync(fp) } catch {}
+            try { fs.unlinkSync(fp) } catch { /* ignore */ }
           }
         })
       }
@@ -381,7 +356,7 @@ describe('App E2E', () => {
         expect(res.body.url).toContain('/uploads/')
         if (res.body.filename) {
           const fp = path.join(uploadsDir, res.body.filename)
-          try { fs.unlinkSync(fp) } catch {}
+          try { fs.unlinkSync(fp) } catch { /* ignore */ }
         }
       }
     })

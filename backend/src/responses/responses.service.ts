@@ -3,7 +3,6 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
-  BadRequestException,
 } from '@nestjs/common'
 import { PrismaService }    from '../prisma/prisma.service'
 import { ComplianceService } from '../compliance/compliance.service'
@@ -108,8 +107,6 @@ export class ResponsesService {
     // La fecha siempre se toma del servidor (ignoramos cualquier fecha
     // que pudiera venir en el DTO). Si el cliente intenta manipularla,
     // el campo `fecha` de Prisma usa @default(now()) y aquí lo forzamos.
-    const today = this.todayCol()
-
     const { answers, ...responseData } = dto
     const response = await this.prisma.response.create({
       data: {

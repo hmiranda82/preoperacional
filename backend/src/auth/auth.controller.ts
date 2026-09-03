@@ -1,4 +1,3 @@
-import { Injectable } from '@nestjs/common'
 import { Controller, Post, Body, HttpCode, HttpStatus, UseGuards } from '@nestjs/common'
 import { Throttle } from '@nestjs/throttler'
 import { AuthService } from './auth.service'
