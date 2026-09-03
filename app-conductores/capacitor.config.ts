@@ -5,11 +5,12 @@ const config: CapacitorConfig = {
   appName: 'Revisión',
   webDir: 'dist',
   server: {
-    androidScheme: 'http',
-    cleartext: true,
+    // SEGURIDAD: HTTPS obligatorio en el WebView. Tokens y PII nunca viajan
+    // en claro; el origin del APK (https://localhost) está en la whitelist
+    // CORS de la API de producción.
+    androidScheme: 'https',
   },
     android: {
-      allowMixedContent: true,
       backgroundColor: '#F2F3F4',
     },
   ios: {

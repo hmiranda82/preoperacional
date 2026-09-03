@@ -54,11 +54,12 @@ services:
       API_URL: https://api.${DOMINIO}
       CORS_ORIGINS: https://admin.${DOMINIO},https://localhost
       LOG_LEVEL: info
+      TRUST_PROXY: "1"
       SENTRY_DSN: ${SENTRY_DSN:-}
     volumes:
       - uploads:/app/uploads
     healthcheck:
-      test: ["CMD", "wget", "--spider", "http://localhost:3002/health"]
+      test: ["CMD", "wget", "--spider", "http://localhost:3002/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3
