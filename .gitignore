@@ -15,7 +15,7 @@ keystore.properties
 # Bases de datos y dumps (.sql) — excepto migraciones de Prisma (versionadas)
 Base de Datos/
 *.sql
-!backend/prisma/migrations/*.sql
+!backend/prisma/migrations/**/*.sql
 *.sql.gz
 *.sql.zip
 
