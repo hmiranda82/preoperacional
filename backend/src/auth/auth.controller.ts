@@ -61,7 +61,11 @@ export class AuthController {
   @Roles('ADMIN', 'SUPER_ROOT')
   @Throttle({ default: { limit: 10, ttl: 60000 } })
   generateReset(@Body() dto: GenerateResetDto, @CurrentUser() user: CurrentUserData) {
-    return this.authService.generatePasswordResetToken(dto.userId, { id: user.id, role: user.role })
+    return this.authService.generatePasswordResetToken(dto.userId, {
+      id: user.id,
+      role: user.role,
+      companyId: user.companyId,
+    })
   }
 
   @Post('logout-all')

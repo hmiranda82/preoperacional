@@ -80,11 +80,10 @@ export class ReportsService {
     companyId?: number
     ciudad?: string
     supervisorId?: number
-    tipoVehiculo?: string
     driverId?: number
     usuario?: string
   }): Promise<ExecutiveReport> {
-    const { year, month, companyId, ciudad, tipoVehiculo, driverId, usuario } = params
+    const { year, month, companyId, ciudad, driverId, usuario } = params
 
     // Build date range for the month
     const firstDay = new Date(year, month - 1, 1)
@@ -104,7 +103,6 @@ export class ReportsService {
     const driverWhere: any = { estado: 'ACTIVO' }
     if (companyId) driverWhere.user = { companyId }
     if (ciudad) driverWhere.ciudad = ciudad
-    if (tipoVehiculo) driverWhere.tipoVehiculo = tipoVehiculo
 
     const userWhere: any = { role: 'DRIVER', isActive: true }
     if (companyId) userWhere.companyId = companyId
@@ -141,9 +139,6 @@ export class ReportsService {
     // Filter to only users with driver records
     const activeDrivers = users.filter(u => u.driver)
     if (ciudad) {
-      // Already filtered above via driverWhere
-    }
-    if (tipoVehiculo) {
       // Already filtered above via driverWhere
     }
 

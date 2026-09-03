@@ -16,16 +16,17 @@ import type { CurrentUserData } from '../common/decorators/current-user.decorato
  * UsersController
  *
  * All routes require JWT authentication.
- * Write operations (POST / PUT / DELETE) additionally require ADMIN role.
- * GET routes are accessible to any authenticated user (needed by the driver app
- * to resolve user names when displaying history).
+ * All routes are ADMIN-only (the driver app does not consume /users;
+ * the driver's own data comes from the JWT and /auth flows).
+ * Write operations additionally enforce same-company (multi-tenant).
  */
 @Controller('users')
 @UseGuards(JwtAuthGuard, RolesGuard)
+@Roles('ADMIN', 'SUPER_ROOT')
 export class UsersController {
   constructor(private usersService: UsersService) {}
 
-  // ─── Read (any authenticated role) ───────────────────────
+  // ─── Read (ADMIN only — expone PII de toda la empresa) ───
   @Get()
   findAll(@CurrentUser() user: CurrentUserData) {
     const companyId = user.role === 'SUPER_ROOT' ? undefined : user.companyId
@@ -74,7 +75,7 @@ export class UsersController {
   @Delete(':id')
   @Roles('ADMIN', 'SUPER_ROOT')
   @HttpCode(HttpStatus.OK)
-  remove(@Param('id', ParseIntPipe) id: number) {
-    return this.usersService.remove(id)
+  remove(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: CurrentUserData) {
+    return this.usersService.remove(id, user)
   }
 }

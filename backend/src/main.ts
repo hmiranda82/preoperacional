@@ -41,6 +41,15 @@ async function bootstrap() {
   // NOTA DE SEGURIDAD: los archivos de /uploads solo se sirven vía
   // GET /api/uploads/:file (protegido por JWT). No se montan estáticos públicos.
 
+  // Trust proxy: detrás de Caddy/Nginx la IP real llega en X-Forwarded-For.
+  // Sin esto, el rate limiting (Throttler) contaría todas las peticiones bajo
+  // la IP del proxy y bloquearía a todos los usuarios colectivamente.
+  // Configurar TRUST_PROXY=1 en producción (docker-compose ya lo hace).
+  const trustProxy = process.env.TRUST_PROXY
+  if (trustProxy) {
+    app.getHttpAdapter().getInstance().set('trust proxy', trustProxy === 'true' ? 1 : Number(trustProxy) || trustProxy)
+  }
+
   app.setGlobalPrefix('api')
 
   const port = process.env.PORT ?? 3000

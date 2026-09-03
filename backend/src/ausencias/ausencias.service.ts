@@ -1,11 +1,22 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common'
+import { Injectable, NotFoundException, ConflictException, ForbiddenException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { CreateAusenciaDto } from './dto/create-ausencia.dto'
 import { UpdateAusenciaDto } from './dto/update-ausencia.dto'
+import { assertSameCompany } from '../common/tenant.util'
+import type { CurrentUserData } from '../common/decorators/current-user.decorator'
 
 @Injectable()
 export class AusenciasService {
   constructor(private prisma: PrismaService) {}
+
+  /** Empresa de un conductor (vía driver.user.companyId) */
+  private async getDriverCompanyId(driverId: number): Promise<number | null> {
+    const d = await this.prisma.driver.findUnique({
+      where:  { id: driverId },
+      select: { user: { select: { companyId: true } } },
+    })
+    return d?.user.companyId ?? null
+  }
 
   private serialize(a: any) {
     return {
@@ -25,9 +36,15 @@ export class AusenciasService {
     }
   }
 
-  async create(dto: CreateAusenciaDto) {
-    const driver = await this.prisma.driver.findUnique({ where: { id: dto.driverId } })
+  async create(dto: CreateAusenciaDto, caller?: CurrentUserData) {
+    const driver = await this.prisma.driver.findUnique({
+      where:  { id: dto.driverId },
+      select: { id: true, user: { select: { companyId: true } } },
+    })
     if (!driver) throw new NotFoundException('Conductor no encontrado')
+
+    // SEGURIDAD multi-tenant: solo conductores de la empresa del ADMIN
+    if (caller) assertSameCompany(caller, driver.user.companyId)
 
     const fecha = new Date(dto.fecha)
 
@@ -85,7 +102,21 @@ export class AusenciasService {
     })
   }
 
-  async isDriverOnAusencia(driverId: number): Promise<boolean> {
+  async isDriverOnAusencia(driverId: number, caller?: CurrentUserData): Promise<boolean> {
+    if (caller) {
+      if (caller.role === 'DRIVER') {
+        // Un DRIVER solo puede consultar su propio estado
+        const own = await this.prisma.driver.findUnique({
+          where:  { userId: caller.id },
+          select: { id: true },
+        })
+        if (!own || own.id !== driverId) {
+          throw new ForbiddenException('Solo puedes consultar tu propio estado')
+        }
+      } else if (caller.role !== 'SUPER_ROOT') {
+        assertSameCompany(caller, await this.getDriverCompanyId(driverId))
+      }
+    }
     const a = await this.findActiveByDriver(driverId)
     return !!a
   }
@@ -94,18 +125,40 @@ export class AusenciasService {
     return this.findActiveByDriver(driverId)
   }
 
-  async findOne(id: number) {
+  async findOne(id: number, caller?: CurrentUserData) {
     const a = await this.prisma.ausencia.findUnique({
       where: { id },
-      include: { driver: { select: { id: true, nombre: true, cedula: true, placa: true } } },
+      include: {
+        driver: {
+          select: {
+            id: true, nombre: true, cedula: true, placa: true,
+            user: { select: { companyId: true } },
+          },
+        },
+      },
     })
     if (!a) throw new NotFoundException(`Ausencia #${id} no encontrada`)
+
+    // SEGURIDAD multi-tenant
+    if (caller) assertSameCompany(caller, (a.driver as any).user.companyId)
+
     return this.serialize(a)
   }
 
-  async update(id: number, dto: UpdateAusenciaDto) {
-    const existing = await this.prisma.ausencia.findUnique({ where: { id } })
+  async update(id: number, dto: UpdateAusenciaDto, caller?: CurrentUserData) {
+    const existing = await this.prisma.ausencia.findUnique({
+      where:  { id },
+      select: { id: true, driverId: true, fecha: true, driver: { select: { user: { select: { companyId: true } } } } },
+    })
     if (!existing) throw new NotFoundException(`Ausencia #${id} no encontrada`)
+
+    // SEGURIDAD multi-tenant: la ausencia y el conductor destino deben ser de la empresa del ADMIN
+    if (caller) {
+      assertSameCompany(caller, (existing as any).driver.user.companyId)
+      if (dto.driverId !== undefined && dto.driverId !== existing.driverId) {
+        assertSameCompany(caller, await this.getDriverCompanyId(dto.driverId))
+      }
+    }
 
     const driverId = dto.driverId ?? existing.driverId
     const fecha = dto.fecha ? new Date(dto.fecha) : existing.fecha
@@ -129,16 +182,30 @@ export class AusenciasService {
     return this.serialize(ausencia)
   }
 
-  async remove(id: number) {
-    const existing = await this.prisma.ausencia.findUnique({ where: { id } })
+  async remove(id: number, caller?: CurrentUserData) {
+    const existing = await this.prisma.ausencia.findUnique({
+      where:  { id },
+      select: { id: true, driver: { select: { user: { select: { companyId: true } } } } },
+    })
     if (!existing) throw new NotFoundException(`Ausencia #${id} no encontrada`)
+
+    // SEGURIDAD multi-tenant
+    if (caller) assertSameCompany(caller, (existing as any).driver.user.companyId)
+
     await this.prisma.ausencia.delete({ where: { id } })
     return { id, _action: 'deleted' }
   }
 
-  async cancel(id: number) {
-    const existing = await this.prisma.ausencia.findUnique({ where: { id } })
+  async cancel(id: number, caller?: CurrentUserData) {
+    const existing = await this.prisma.ausencia.findUnique({
+      where:  { id },
+      select: { id: true, driver: { select: { user: { select: { companyId: true } } } } },
+    })
     if (!existing) throw new NotFoundException(`Ausencia #${id} no encontrada`)
+
+    // SEGURIDAD multi-tenant
+    if (caller) assertSameCompany(caller, (existing as any).driver.user.companyId)
+
     const ausencia = await this.prisma.ausencia.update({
       where: { id },
       data: { activo: false },

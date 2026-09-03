@@ -10,6 +10,7 @@ import { PrismaService } from '../prisma/prisma.service'
 import { CreateUserDto } from './dto/create-user.dto'
 import { UpdateUserDto } from './dto/update-user.dto'
 import type { CurrentUserData } from '../common/decorators/current-user.decorator'
+import { assertSameCompany } from '../common/tenant.util'
 import {
   passwordPolicyErrors,
   passwordPolicyContextErrors,
@@ -401,7 +402,7 @@ export class UsersService {
     return this.serializeUser(updated)
   }
 
-  async remove(id: number) {
+  async remove(id: number, caller: CurrentUserData) {
     const user = await this.prisma.user.findUnique({
       where: { id },
       include: {
@@ -415,6 +416,13 @@ export class UsersService {
     })
 
     if (!user) throw new NotFoundException(`Usuario #${id} no encontrado`)
+
+    // SEGURIDAD multi-tenant: un ADMIN solo puede eliminar cuentas de su empresa
+    assertSameCompany(caller, user.companyId)
+    // Solo SUPER_ROOT puede eliminar cuentas SUPER_ROOT
+    if (user.role === 'SUPER_ROOT' && caller.role !== 'SUPER_ROOT') {
+      throw new ForbiddenException('No tienes permisos para eliminar cuentas SUPER_ROOT')
+    }
 
     const serialized = this.serializeUser(user)
     const responseCount = (user.driver as any)?._count?.responses ?? 0

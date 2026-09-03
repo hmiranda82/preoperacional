@@ -9,6 +9,8 @@ import { ComplianceService } from '../compliance/compliance.service'
 import { VacationsService }  from '../vacations/vacations.service'
 import { AusenciasService }  from '../ausencias/ausencias.service'
 import { CreateResponseDto } from './dto/create-response.dto'
+import { assertSameCompany } from '../common/tenant.util'
+import type { CurrentUserData } from '../common/decorators/current-user.decorator'
 
 const RESPONSE_INCLUDE = {
   answers: {
@@ -210,12 +212,16 @@ export class ResponsesService {
     return responses.map(r => this.serializeResponse(r))
   }
 
-  async findByUser(userId: number) {
+  async findByUser(userId: number, caller?: CurrentUserData) {
     const driver = await this.prisma.driver.findUnique({
       where:  { userId },
-      select: { id: true },
+      select: { id: true, user: { select: { companyId: true } } },
     })
     if (!driver) return []
+
+    // SEGURIDAD multi-tenant: un ADMIN solo puede leer historiales de su empresa
+    if (caller) assertSameCompany(caller, driver.user.companyId)
+
     const responses = await this.prisma.response.findMany({
       where:   { driverId: driver.id },
       orderBy: { fecha: 'desc' },
@@ -224,7 +230,16 @@ export class ResponsesService {
     return responses.map(r => this.serializeResponse(r))
   }
 
-  async findOne(id: number) {
+  async findOne(id: number, caller?: CurrentUserData) {
+    const owner = await this.prisma.response.findUnique({
+      where:   { id },
+      select:  { driver: { select: { user: { select: { companyId: true } } } } },
+    })
+    if (!owner) throw new NotFoundException(`Respuesta #${id} no encontrada`)
+
+    // SEGURIDAD multi-tenant: un ADMIN solo puede leer inspecciones de su empresa
+    if (caller) assertSameCompany(caller, owner.driver.user.companyId)
+
     const response = await this.prisma.response.findUnique({
       where:   { id },
       include: RESPONSE_INCLUDE,

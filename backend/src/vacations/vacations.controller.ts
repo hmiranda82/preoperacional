@@ -18,8 +18,8 @@ export class VacationsController {
 
   @Post()
   @Roles('ADMIN')
-  create(@Body() dto: CreateVacationDto) {
-    return this.service.create(dto)
+  create(@Body() dto: CreateVacationDto, @CurrentUser() user: CurrentUserData) {
+    return this.service.create(dto, user)
   }
 
   @Get()
@@ -41,30 +41,31 @@ export class VacationsController {
 
   @Get('check/:driverId')
   @Roles('ADMIN', 'DRIVER')
-  checkDriver(@Param('driverId', ParseIntPipe) driverId: number) {
-    return this.service.isDriverOnVacation(driverId)
+  checkDriver(@Param('driverId', ParseIntPipe) driverId: number, @CurrentUser() user: CurrentUserData) {
+    return this.service.isDriverOnVacation(driverId, user)
   }
 
   @Get(':id')
-  findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.service.findOne(id)
+  @Roles('ADMIN', 'SUPER_ROOT')
+  findOne(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: CurrentUserData) {
+    return this.service.findOne(id, user)
   }
 
   @Put(':id')
   @Roles('ADMIN')
-  update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateVacationDto) {
-    return this.service.update(id, dto)
+  update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateVacationDto, @CurrentUser() user: CurrentUserData) {
+    return this.service.update(id, dto, user)
   }
 
   @Delete(':id')
   @Roles('ADMIN')
-  remove(@Param('id', ParseIntPipe) id: number) {
-    return this.service.remove(id)
+  remove(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: CurrentUserData) {
+    return this.service.remove(id, user)
   }
 
   @Patch(':id/cancel')
   @Roles('ADMIN')
-  cancel(@Param('id', ParseIntPipe) id: number) {
-    return this.service.cancel(id)
+  cancel(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: CurrentUserData) {
+    return this.service.cancel(id, user)
   }
 }

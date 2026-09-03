@@ -1,11 +1,22 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common'
+import { Injectable, NotFoundException, ConflictException, ForbiddenException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { CreateVacationDto } from './dto/create-vacation.dto'
 import { UpdateVacationDto } from './dto/update-vacation.dto'
+import { assertSameCompany } from '../common/tenant.util'
+import type { CurrentUserData } from '../common/decorators/current-user.decorator'
 
 @Injectable()
 export class VacationsService {
   constructor(private prisma: PrismaService) {}
+
+  /** Empresa de un conductor (vía driver.user.companyId) */
+  private async getDriverCompanyId(driverId: number): Promise<number | null> {
+    const d = await this.prisma.driver.findUnique({
+      where:  { id: driverId },
+      select: { user: { select: { companyId: true } } },
+    })
+    return d?.user.companyId ?? null
+  }
 
   private serialize(v: any) {
     const days = (v.days || []).map((d: any) => ({
@@ -32,9 +43,15 @@ export class VacationsService {
     }
   }
 
-  async create(dto: CreateVacationDto) {
-    const driver = await this.prisma.driver.findUnique({ where: { id: dto.driverId } })
+  async create(dto: CreateVacationDto, caller?: CurrentUserData) {
+    const driver = await this.prisma.driver.findUnique({
+      where:  { id: dto.driverId },
+      select: { id: true, user: { select: { companyId: true } } },
+    })
     if (!driver) throw new NotFoundException('Conductor no encontrado')
+
+    // SEGURIDAD multi-tenant: solo conductores de la empresa del ADMIN
+    if (caller) assertSameCompany(caller, driver.user.companyId)
 
     const inicio = new Date(dto.fechaInicio)
     const fin = new Date(dto.fechaFin)
@@ -121,26 +138,63 @@ export class VacationsService {
     })
   }
 
-  async isDriverOnVacation(driverId: number): Promise<boolean> {
+  async isDriverOnVacation(driverId: number, caller?: CurrentUserData): Promise<boolean> {
+    if (caller) {
+      if (caller.role === 'DRIVER') {
+        // Un DRIVER solo puede consultar su propio estado
+        const own = await this.prisma.driver.findUnique({
+          where:  { userId: caller.id },
+          select: { id: true },
+        })
+        if (!own || own.id !== driverId) {
+          throw new ForbiddenException('Solo puedes consultar tu propio estado')
+        }
+      } else if (caller.role !== 'SUPER_ROOT') {
+        assertSameCompany(caller, await this.getDriverCompanyId(driverId))
+      }
+    }
     const d = await this.findActiveByDriver(driverId)
     return !!d
   }
 
-  async findOne(id: number) {
+  async findOne(id: number, caller?: CurrentUserData) {
     const v = await this.prisma.vacation.findUnique({
       where: { id },
       include: {
-        driver: { select: { id: true, nombre: true, cedula: true, placa: true } },
+        driver: {
+          select: {
+            id: true, nombre: true, cedula: true, placa: true,
+            user: { select: { companyId: true } },
+          },
+        },
         days: { where: { activo: true } },
       },
     })
     if (!v) throw new NotFoundException(`Vacación #${id} no encontrada`)
+
+    // SEGURIDAD multi-tenant
+    if (caller) assertSameCompany(caller, (v.driver as any).user.companyId)
+
     return this.serialize(v)
   }
 
-  async update(id: number, dto: UpdateVacationDto) {
-    const existing = await this.prisma.vacation.findUnique({ where: { id } })
+  async update(id: number, dto: UpdateVacationDto, caller?: CurrentUserData) {
+    const existing = await this.prisma.vacation.findUnique({
+      where:  { id },
+      select: {
+        id: true, driverId: true, fechaInicio: true, fechaFin: true,
+        driver: { select: { user: { select: { companyId: true } } } },
+      },
+    })
     if (!existing) throw new NotFoundException(`Vacación #${id} no encontrada`)
+
+    // SEGURIDAD multi-tenant: la vacación y el conductor destino deben ser de la empresa del ADMIN
+    if (caller) {
+      assertSameCompany(caller, (existing as any).driver.user.companyId)
+      if (dto.driverId !== undefined && dto.driverId !== existing.driverId) {
+        assertSameCompany(caller, await this.getDriverCompanyId(dto.driverId))
+      }
+    }
 
     const driverId = dto.driverId ?? existing.driverId
     const inicio = dto.fechaInicio ? new Date(dto.fechaInicio) : existing.fechaInicio
@@ -172,16 +226,30 @@ export class VacationsService {
     return this.serialize(vacation)
   }
 
-  async remove(id: number) {
-    const existing = await this.prisma.vacation.findUnique({ where: { id } })
+  async remove(id: number, caller?: CurrentUserData) {
+    const existing = await this.prisma.vacation.findUnique({
+      where:  { id },
+      select: { id: true, driver: { select: { user: { select: { companyId: true } } } } },
+    })
     if (!existing) throw new NotFoundException(`Vacación #${id} no encontrada`)
+
+    // SEGURIDAD multi-tenant
+    if (caller) assertSameCompany(caller, (existing as any).driver.user.companyId)
+
     await this.prisma.vacation.delete({ where: { id } })
     return { id, _action: 'deleted' }
   }
 
-  async cancel(id: number) {
-    const existing = await this.prisma.vacation.findUnique({ where: { id } })
+  async cancel(id: number, caller?: CurrentUserData) {
+    const existing = await this.prisma.vacation.findUnique({
+      where:  { id },
+      select: { id: true, driver: { select: { user: { select: { companyId: true } } } } },
+    })
     if (!existing) throw new NotFoundException(`Vacación #${id} no encontrada`)
+
+    // SEGURIDAD multi-tenant
+    if (caller) assertSameCompany(caller, (existing as any).driver.user.companyId)
+
     const vacation = await this.prisma.vacation.update({
       where: { id },
       data: {

@@ -18,7 +18,6 @@ export class ReportsController {
     @Query('companyId') companyId?: string,
     @Query('ciudad') ciudad?: string,
     @Query('supervisorId') supervisorId?: string,
-    @Query('tipoVehiculo') tipoVehiculo?: string,
     @Query('driverId') driverId?: string,
     @CurrentUser() user?: any,
   ): Promise<ExecutiveReport> {
@@ -46,7 +45,6 @@ export class ReportsController {
       companyId: effectiveCompanyId,
       ciudad: ciudad || undefined,
       supervisorId: supervisorIdNum,
-      tipoVehiculo: tipoVehiculo || undefined,
       driverId: driverIdNum,
       usuario: user?.email || 'Administrador',
     })

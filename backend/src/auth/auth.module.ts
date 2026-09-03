@@ -20,7 +20,10 @@ import { JwtStrategy } from '../common/guards/jwt.strategy'
         }
         return {
           secret,
-          signOptions: { expiresIn: (config.get<string>('JWT_EXPIRES_IN') || '8h') as any },
+          signOptions: {
+            expiresIn: (config.get<string>('JWT_EXPIRES_IN') || '8h') as any,
+            algorithm: 'HS256',
+          },
         }
       },
       inject: [ConfigService],

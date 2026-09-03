@@ -16,6 +16,7 @@ import {
   RESET_TOKEN_HEX_LENGTH,
   RESET_TOKEN_TTL_MINUTES,
 } from '../common/password-policy'
+import { assertSameCompany } from '../common/tenant.util'
 
 const ACCESS_TOKEN_EXPIRY = '1h'
 const REFRESH_TOKEN_EXPIRY_DAYS = 7
@@ -260,6 +261,10 @@ export class AuthService {
       throw new BadRequestException('La cuenta está inactiva')
     }
 
+    // SEGURIDAD: valida la política ANTES de consumir el token. Si la contraseña
+    // no cumple, el token queda intacto para un nuevo intento (no se quema).
+    this.assertPasswordPolicy({ email: record.user.email }, newPassword)
+
     await this.prisma.passwordReset.update({
       where: { id: record.id },
       data: { usedAt: new Date() },
@@ -277,6 +282,23 @@ export class AuthService {
   }
 
   /**
+   * Valida la política de contraseñas (longitud, banlist, secuencias y contexto
+   * del usuario). Lanza BadRequest con el primer error encontrado.
+   */
+  private assertPasswordPolicy(
+    user: { email: string; cedula?: string | null },
+    newPassword: string,
+  ): void {
+    const policy = passwordPolicyErrors(newPassword) ?? passwordPolicyContextErrors(newPassword, {
+      email: user.email,
+      cedula: user.cedula as any,
+    })
+    if (policy) {
+      throw new BadRequestException(policy)
+    }
+  }
+
+  /**
    * Aplica una nueva contraseña validando la política de seguridad, la guarda con
    * bcrypt (cost 12), registra el timestamp y revoca las sesiones previas.
    */
@@ -285,13 +307,7 @@ export class AuthService {
     newPassword: string,
     action: 'CHANGE' | 'RESET',
   ) {
-    const policy = passwordPolicyErrors(newPassword) ?? passwordPolicyContextErrors(newPassword, {
-      email: user.email,
-      cedula: user.cedula as any,
-    })
-    if (policy) {
-      throw new BadRequestException(policy)
-    }
+    this.assertPasswordPolicy(user, newPassword)
 
     const passwordChangedAt = new Date()
     const hashedPassword = await bcrypt.hash(newPassword, 12)
@@ -316,11 +332,18 @@ export class AuthService {
    * vez, para que el solicitante lo entregue); en BD se guarda solo su hash.
    * Al consumirlo se marcará mustChangePassword = true.
    */
-  async generatePasswordResetToken(userId: number, createdBy: { id: number; role: string }) {
+  async generatePasswordResetToken(
+    userId: number,
+    createdBy: { id: number; role: string; companyId: number },
+  ) {
     const target = await this.usersService.findRawById(userId)
     if (!target) {
       throw new BadRequestException('Usuario no encontrado')
     }
+
+    // SEGURIDAD multi-tenant: un ADMIN solo puede generar tokens de reset para
+    // cuentas de su propia empresa (evita toma de control cross-tenant).
+    assertSameCompany(createdBy, target.companyId)
 
     // Solo SUPER_ROOT puede generar tokens para cuentas SUPER_ROOT
     if (target.role === 'SUPER_ROOT' && createdBy.role !== 'SUPER_ROOT') {

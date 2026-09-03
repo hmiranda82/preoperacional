@@ -17,9 +17,14 @@ export class QuestionsService {
     })
   }
 
-  async findOne(id: number) {
-    const q = await this.prisma.question.findUnique({ where: { id } })
-    if (!q) throw new NotFoundException(`Pregunta #${id} no encontrada`)
+  async findOne(id: number, companyId?: number) {
+    const q = await this.prisma.question.findUnique({
+      where: { id },
+      include: { form: { select: { companyId: true } } },
+    })
+    if (!q || (companyId && q.form.companyId !== companyId)) {
+      throw new NotFoundException(`Pregunta #${id} no encontrada`)
+    }
     return q
   }
 

@@ -66,7 +66,7 @@ export class ResponsesController {
     return this.responsesService.findByRange(from, to, companyId)
   }
 
-  // Conductors read their own history; admins can read anyone's
+  // Conductors read their own history; admins can read anyone's (same company)
   @Get('user/:userId')
   findByUser(
     @Param('userId') userId: string,
@@ -74,15 +74,15 @@ export class ResponsesController {
   ) {
     const targetId = Number(userId)
     // Conductores solo pueden leer su propio historial
-    if (user.role !== 'ADMIN' && user.id !== targetId) {
+    if (user.role !== 'ADMIN' && user.role !== 'SUPER_ROOT' && user.id !== targetId) {
       throw new ForbiddenException('Solo puedes ver tu propio historial')
     }
-    return this.responsesService.findByUser(targetId)
+    return this.responsesService.findByUser(targetId, user)
   }
 
   @Get(':id')
   @Roles('ADMIN')
-  findOne(@Param('id') id: string) {
-    return this.responsesService.findOne(Number(id))
+  findOne(@Param('id') id: string, @CurrentUser() user: CurrentUserData) {
+    return this.responsesService.findOne(Number(id), user)
   }
 }

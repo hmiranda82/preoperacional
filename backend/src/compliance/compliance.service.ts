@@ -1,8 +1,10 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable, Logger, NotFoundException } from '@nestjs/common'
 import { Cron }                  from '@nestjs/schedule'
 import { PrismaService }          from '../prisma/prisma.service'
 import { VacationsService }       from '../vacations/vacations.service'
 import { AusenciasService }       from '../ausencias/ausencias.service'
+import { assertSameCompany }      from '../common/tenant.util'
+import type { CurrentUserData }   from '../common/decorators/current-user.decorator'
 
 /**
  * ComplianceService
@@ -102,8 +104,30 @@ export class ComplianceService {
 
   @Cron('59 4 * * *', { timeZone: 'UTC' })   // = 23:59 America/Bogota
   async closeDayCron(): Promise<void> {
-    const companies = await this.prisma.company.findMany({ select: { id: true } })
-    await Promise.all(companies.map(c => this.closeDay(undefined, c.id)))
+    let companies: Array<{ id: number }>
+    try {
+      companies = await this.prisma.company.findMany({ select: { id: true } })
+    } catch (err) {
+      this.logger.error('Cron cierre diario: no fue posible listar empresas', err instanceof Error ? err.stack : String(err))
+      return
+    }
+
+    // Cierra cada empresa de forma aislada: un fallo no bloquea a las demás
+    const results = await Promise.all(
+      companies.map(async (c) => {
+        try {
+          return await this.closeDay(undefined, c.id)
+        } catch (err) {
+          this.logger.error(`Cron cierre diario falló para empresa #${c.id}`, err instanceof Error ? err.stack : String(err))
+          return null
+        }
+      }),
+    )
+
+    const failed = results.filter((r) => r === null).length
+    if (failed > 0) {
+      this.logger.error(`Cierre diario incompleto: ${failed}/${companies.length} empresas con error (sin reintento automático)`)
+    }
   }
 
   /**
@@ -266,9 +290,19 @@ export class ComplianceService {
   }
 
   /** Historial de incumplimientos de un conductor específico */
-  async getDriverHistory(driverId: number, days = 30): Promise<Array<{
+  async getDriverHistory(driverId: number, days = 30, caller?: CurrentUserData): Promise<Array<{
     fecha: string; estado: string; horaInspeccion: string | null
   }>> {
+    // SEGURIDAD multi-tenant: un ADMIN solo puede consultar conductores de su empresa
+    if (caller) {
+      const driver = await this.prisma.driver.findUnique({
+        where:  { id: driverId },
+        select: { user: { select: { companyId: true } } },
+      })
+      if (!driver) throw new NotFoundException(`Conductor #${driverId} no encontrado`)
+      assertSameCompany(caller, driver.user.companyId)
+    }
+
     const today = new Date(this.todayCol())
     const from  = new Date(today)
     from.setDate(from.getDate() - days + 1)

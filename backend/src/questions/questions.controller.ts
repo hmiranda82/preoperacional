@@ -24,8 +24,9 @@ export class QuestionsController {
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.questionsService.findOne(Number(id))
+  findOne(@Param('id') id: string, @CurrentUser() user?: CurrentUserData) {
+    const companyId = user?.role === 'SUPER_ROOT' ? undefined : user?.companyId
+    return this.questionsService.findOne(Number(id), companyId)
   }
 
   // Write — ADMIN only

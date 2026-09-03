@@ -36,22 +36,25 @@ export class ComplianceController {
     return this.service.getIncumplidos(fecha, cid)
   }
 
-  /** Historial de un conductor específico */
+  /** Historial de un conductor específico (restringido a su empresa) */
   @Get('driver/:id')
   driverHistory(
     @Param('id', ParseIntPipe) id: number,
     @Query('days') days?: string,
+    @CurrentUser() user?: CurrentUserData,
   ) {
-    return this.service.getDriverHistory(id, days ? Number(days) : 30)
+    return this.service.getDriverHistory(id, days ? Number(days) : 30, user)
   }
 
   /**
    * POST /compliance/close-day
    * Cierra el día manualmente (para pruebas o corrección).
-   * En producción lo ejecuta el cron automáticamente.
+   * ADMIN solo cierra el día de su empresa; SUPER_ROOT puede omitir el filtro
+   * (equivale al cron). En producción lo ejecuta el cron automáticamente.
    */
   @Post('close-day')
-  closeDay(@Query('fecha') fecha?: string) {
-    return this.service.closeDay(fecha)
+  closeDay(@Query('fecha') fecha?: string, @CurrentUser() user?: CurrentUserData) {
+    const cid = user?.role === 'SUPER_ROOT' ? undefined : user?.companyId
+    return this.service.closeDay(fecha, cid)
   }
 }
