@@ -60,31 +60,35 @@ export class VacationsService {
     const uniqueDays = [...new Set(dto.days)].sort()
     if (!uniqueDays.length) throw new ConflictException('Debes seleccionar al menos un día de vacaciones')
 
-    // Remove existing VacationDay records for these dates to avoid unique constraint violation
-    await this.prisma.vacationDay.deleteMany({
-      where: {
-        driverId: dto.driverId,
-        fecha: { in: uniqueDays.map(f => new Date(f)) },
-      },
-    })
-
-    const vacation = await this.prisma.vacation.create({
-      data: {
-        driverId: dto.driverId,
-        fechaInicio: inicio,
-        fechaFin: fin,
-        motivo: dto.motivo,
-        days: {
-          create: uniqueDays.map(f => ({
-            driverId: dto.driverId,
-            fecha: new Date(f),
-          })),
+    // Atómico: la limpieza de días previos y la creación de la vacación
+    // se ejecutan juntas (antes un fallo a mitad dejaba días huérfanos).
+    const vacation = await this.prisma.$transaction(async (tx) => {
+      // Remove existing VacationDay records for these dates to avoid unique constraint violation
+      await tx.vacationDay.deleteMany({
+        where: {
+          driverId: dto.driverId,
+          fecha: { in: uniqueDays.map(f => new Date(f)) },
         },
-      },
-      include: {
-        driver: { select: { id: true, nombre: true, cedula: true, placa: true } },
-        days: true,
-      },
+      })
+
+      return tx.vacation.create({
+        data: {
+          driverId: dto.driverId,
+          fechaInicio: inicio,
+          fechaFin: fin,
+          motivo: dto.motivo,
+          days: {
+            create: uniqueDays.map(f => ({
+              driverId: dto.driverId,
+              fecha: new Date(f),
+            })),
+          },
+        },
+        include: {
+          driver: { select: { id: true, nombre: true, cedula: true, placa: true } },
+          days: true,
+        },
+      })
     })
     return this.serialize(vacation)
   }

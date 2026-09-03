@@ -1,6 +1,6 @@
 import {
   Controller, Get, Post, Put, Delete,
-  Body, Param, ParseIntPipe,
+  Body, Param, ParseIntPipe, Query,
   UseGuards, HttpCode, HttpStatus, ForbiddenException,
 } from '@nestjs/common'
 import { UsersService }    from './users.service'
@@ -27,10 +27,19 @@ export class UsersController {
   constructor(private usersService: UsersService) {}
 
   // ─── Read (ADMIN only — expone PII de toda la empresa) ───
+  // Paginación opcional: ?limit=100&page=2 (sin params devuelve todo)
   @Get()
-  findAll(@CurrentUser() user: CurrentUserData) {
-    const companyId = user.role === 'SUPER_ROOT' ? undefined : user.companyId
-    return this.usersService.findAll(companyId)
+  findAll(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @CurrentUser() user?: CurrentUserData,
+  ) {
+    const companyId = user?.role === 'SUPER_ROOT' ? undefined : user?.companyId
+    return this.usersService.findAll(
+      companyId,
+      page ? Number(page) : undefined,
+      limit ? Number(limit) : undefined,
+    )
   }
 
   @Get(':id')

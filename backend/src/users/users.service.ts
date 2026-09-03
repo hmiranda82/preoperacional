@@ -169,13 +169,22 @@ export class UsersService {
     return this.serializeUser(withVac[0])
   }
 
-  async findAll(companyId?: number) {
+  /**
+   * Lista usuarios de la empresa.
+   * Paginación opcional no invasiva: sin query params devuelve TODOS (comportamiento
+   * actual que consume el panel); con ?limit=&page= acota server-side (tope 1000)
+   * para prepararlo a flotas grandes sin romper a los consumidores actuales.
+   */
+  async findAll(companyId?: number, page?: number, limit?: number) {
     const where: any = { role: { not: 'SUPER_ROOT' } }
     if (companyId) where.companyId = companyId
+    const take = limit && limit > 0 ? Math.min(Math.floor(limit), 1000) : undefined
+    const skip = take && page && page > 1 ? (Math.floor(page) - 1) * take : undefined
     const users = await this.prisma.user.findMany({
       where,
       include: USER_INCLUDE,
       orderBy: { createdAt: 'desc' },
+      ...(take ? { take, skip: skip ?? 0 } : {}),
     })
     const withVacations = await this.attachVacationStatus(users)
     return withVacations.map((user) => this.serializeUser(user))
@@ -386,18 +395,25 @@ export class UsersService {
       }
     }
 
-    const updated = await this.prisma.user.update({
-      where: { id },
-      data,
-      include: USER_INCLUDE,
-    })
+    // Atómico: el update del usuario y la revocación de sesiones se ejecutan
+    // juntas (antes un fallo a mitad podía dejar sesiones activas con la
+    // contraseña antigua ya cambiada).
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const u = await tx.user.update({
+        where: { id },
+        data,
+        include: USER_INCLUDE,
+      })
 
-    // Invalida todas las sesiones del usuario cuyo password cambió (el caller
-    // conserva la suya porque su access token sigue vigente; al expirar deberá
-    // reautenticarse con la nueva contraseña).
-    if (mustDeleteSessions) {
-      await this.prisma.session.deleteMany({ where: { userId: id } })
-    }
+      // Invalida todas las sesiones del usuario cuyo password cambió (el caller
+      // conserva la suya porque su access token sigue vigente; al expirar deberá
+      // reautenticarse con la nueva contraseña).
+      if (mustDeleteSessions) {
+        await tx.session.deleteMany({ where: { userId: id } })
+      }
+
+      return u
+    })
 
     return this.serializeUser(updated)
   }

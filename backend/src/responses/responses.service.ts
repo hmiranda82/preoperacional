@@ -3,6 +3,7 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
+  BadRequestException,
 } from '@nestjs/common'
 import { PrismaService }    from '../prisma/prisma.service'
 import { ComplianceService } from '../compliance/compliance.service'
@@ -110,16 +111,34 @@ export class ResponsesService {
     // que pudiera venir en el DTO). Si el cliente intenta manipularla,
     // el campo `fecha` de Prisma usa @default(now()) y aquí lo forzamos.
     const { answers, ...responseData } = dto
-    const response = await this.prisma.response.create({
-      data: {
-        ...responseData,
-        driverId,
-        fecha: new Date(),        // siempre la fecha/hora actual del servidor
-        placa: responseData.placa?.toUpperCase().trim(),
-        answers: { create: answers },
+
+    // REGLA 1 re-verificada DENTRO de una transacción serializable: cierra la
+    // carrera en la que dos submits simultáneos pasan el check inicial y crean
+    // dos inspecciones el mismo día.
+    const response = await this.prisma.$transaction(
+      async (tx) => {
+        const duplicada = await tx.response.findFirst({
+          where: { driverId, fecha: this.getDayRange() },
+          select: { id: true },
+        })
+        if (duplicada) {
+          throw new ConflictException(
+            'Ya realizaste tu inspección preoperacional hoy. Solo se permite una por día.',
+          )
+        }
+        return tx.response.create({
+          data: {
+            ...responseData,
+            driverId,
+            fecha: new Date(),        // siempre la fecha/hora actual del servidor
+            placa: responseData.placa?.toUpperCase().trim(),
+            answers: { create: answers },
+          },
+          include: RESPONSE_INCLUDE,
+        })
       },
-      include: RESPONSE_INCLUDE,
-    })
+      { isolationLevel: 'Serializable' },
+    )
 
     // REGLA 3: Marcar como COMPLETADO en daily_status (upsert)
     await this.compliance.markCompleted(driverId, response.id)
@@ -181,7 +200,7 @@ export class ResponsesService {
     // Validar formato YYYY-MM-DD
     const isoRe = /^\d{4}-\d{2}-\d{2}$/
     if (!isoRe.test(desde) || !isoRe.test(hasta)) {
-      throw new Error('Las fechas deben tener formato YYYY-MM-DD')
+      throw new BadRequestException('Las fechas deben tener formato YYYY-MM-DD')
     }
 
     // Rango UTC que cubre ambos días en Colombia (UTC-5)

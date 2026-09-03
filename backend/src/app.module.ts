@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common'
-import { APP_GUARD } from '@nestjs/core'
+import { APP_FILTER, APP_GUARD } from '@nestjs/core'
 import { ConfigModule } from '@nestjs/config'
 import { ScheduleModule } from '@nestjs/schedule'
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler'
@@ -19,10 +19,15 @@ import { VacationsModule } from './vacations/vacations.module'
 import { AusenciasModule } from './ausencias/ausencias.module'
 import { ReportsModule } from './reports/reports.module'
 import { DashboardModule } from './dashboard/dashboard.module'
+import { GlobalExceptionFilter } from './common/filters/http-exception.filter'
+import { MaintenanceService } from './common/maintenance.service'
+import { validateEnv } from './common/config/validate-env'
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
+    // Validación fail-fast del entorno: si falta algo esencial el proceso
+    // no arranca (antes JWT_SECRET fallaba recién en el primer request).
+    ConfigModule.forRoot({ isGlobal: true, validate: validateEnv }),
     ScheduleModule.forRoot(),
     // Rate limiting global: 30 req/60s por IP por defecto.
     // Los @Throttle() específicos (p. ej. /auth/login: 5/60s) lo sobreescriben.
@@ -47,6 +52,11 @@ import { DashboardModule } from './dashboard/dashboard.module'
   providers: [
     // Activa ThrottlerGuard globalmente (necesario para que @Throttle funcione)
     { provide: APP_GUARD, useClass: ThrottlerGuard },
+    // Filtro global de errores: formato uniforme {statusCode, message,
+    // timestamp, path} + stack en logs (antes estaba sin registrar).
+    { provide: APP_FILTER, useClass: GlobalExceptionFilter },
+    // Tareas de mantenimiento (purga de sesiones y tokens expirados)
+    MaintenanceService,
   ],
 })
 export class AppModule {}
