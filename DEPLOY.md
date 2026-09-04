@@ -103,17 +103,18 @@ cambio forzado), pero déjalo en `false` como estado estable.
 
 ## 6. Backups automáticos
 
-Cron diario (03:00 UTC) en el VPS:
+El script `scripts/backup.sh` hace dump consistente de MySQL + empaqueta las
+fotos del volumen `uploads`, con retención de 30 días y copia externa opcional
+(`BACKUP_REMOTE` vía rsync — **el backup nunca debe vivir solo en el VPS**):
 
 ```bash
+chmod +x /opt/preoperacional/scripts/backup.sh
 sudo tee /etc/cron.d/preoperacional-backup <<'EOF'
 0 3 * * * root /opt/preoperacional/scripts/backup.sh >> /var/log/preoperacional-backup.log 2>&1
 EOF
 ```
 
-Crea `scripts/backup.sh` con dump de MySQL + copia del volumen `uploads`,
-retención de 30 días y copia externa (object storage u otro servidor).
-*El script de backup se entrega por separado si aún no existe.*
+Prueba una restauración antes de dar el despliegue por terminado.
 
 ## 7. Checklist final de producción
 

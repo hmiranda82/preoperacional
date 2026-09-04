@@ -1,75 +1,61 @@
-#!/usr/bin/env bash
-set -euo pipefail
-
-# ───────────────────────────────────────────────────────────
-# backup.sh — Backup de la base de datos MySQL (docker)
-# Guarda en ./backups/ con timestamp, rota >30 días.
-# Opcional: sube a S3 si AWS_S3_BUCKET está definido.
-# ───────────────────────────────────────────────────────────
+#!/bin/sh
+# ─────────────────────────────────────────────────────────────
+# PREOPERACIONAL — Backup diario (BD + fotos)
+# ─────────────────────────────────────────────────────────────
+# Ejecutar desde cron del VPS. Requiere Docker con el stack levantado.
+#
+# Cron sugerido (03:00 UTC = 22:00 Colombia):
+#   0 3 * * * /opt/preoperacional/scripts/backup.sh >> /var/log/preoperacional-backup.log 2>&1
+#
+# Variables opcionales:
+#   BACKUP_DIR       destino local (default ./backups; en VPS usar /var/backups/preoperacional)
+#   RETENTION_DAYS   días de retención (default 30)
+#   BACKUP_REMOTE    destino rsync remoto (ej: user@backup-host:/backups/preoperacional/)
+#                    — el backup NUNCA debe vivir solo en el VPS
+# ─────────────────────────────────────────────────────────────
+set -eu
 
 cd "$(dirname "$0")/.."
 
-BACKUP_DIR="./backups"
-TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-BACKUP_FILE="${BACKUP_DIR}/preoperacional_db_${TIMESTAMP}.sql.gz"
+BACKUP_DIR="${BACKUP_DIR:-./backups}"
+RETENTION_DAYS="${RETENTION_DAYS:-30}"
+DATE="$(date +%Y%m%d-%H%M%S)"
 
-mkdir -p "${BACKUP_DIR}"
+mkdir -p "$BACKUP_DIR"
 
-# ── 1. Obtener password desde .env ────────────────────────
-if [ ! -f .env ]; then
-  echo "Error: archivo .env no encontrado en $(pwd)"
+# 1) Dump consistente de MySQL.
+# Credenciales leídas del propio contenedor db (MYSQL_USER/MYSQL_PASSWORD
+# vienen del .env vía docker-compose; nunca se escriben en claro aquí).
+docker compose exec -T db sh -c \
+  'exec mysqldump -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" --single-transaction --routines --triggers --events "$MYSQL_DATABASE"' \
+  | gzip > "$BACKUP_DIR/db-$DATE.sql.gz"
+
+# Validar que el dump no esté vacío (fallar fuerte, no dejar un backup tumba)
+if [ ! -s "$BACKUP_DIR/db-$DATE.sql.gz" ]; then
+  rm -f "$BACKUP_DIR/db-$DATE.sql.gz"
+  echo "[backup] ERROR: el dump de la BD quedó vacío" >&2
   exit 1
 fi
+echo "[backup] dump BD: db-$DATE.sql.gz"
 
-# shellcheck disable=SC2046
-export $(grep -v '^\s*#' .env | grep -v '^\s*$' | xargs)
+# 2) Fotos de inspecciones (volumen uploads montado en preoperacional-api)
+docker run --rm --volumes-from preoperacional-api -v "$(cd "$BACKUP_DIR" && pwd)":/backup alpine:3 \
+  sh -c "tar czf /backup/uploads-$DATE.tar.gz -C /app/uploads ."
 
-DB_NAME="preoperacional_db"
-DB_USER="${MYSQL_USER:-preop_user}"
-DB_PASS="${MYSQL_APP_PASSWORD}"
-DB_CONTAINER="preoperacional-db"
-
-if [ -z "${DB_PASS}" ]; then
-  echo "Error: MYSQL_APP_PASSWORD no está definido en .env"
+if [ ! -s "$BACKUP_DIR/uploads-$DATE.tar.gz" ]; then
+  rm -f "$BACKUP_DIR/uploads-$DATE.tar.gz"
+  echo "[backup] ERROR: el paquete de uploads quedó vacío" >&2
   exit 1
 fi
+echo "[backup] fotos: uploads-$DATE.tar.gz"
 
-# ── 2. Ejecutar mysqldump y comprimir ─────────────────────
-echo "⏺ Respaldando ${DB_NAME} desde ${DB_CONTAINER}..."
+# 3) Retención: elimina backups más viejos que RETENTION_DAYS
+find "$BACKUP_DIR" -type f \( -name 'db-*.sql.gz' -o -name 'uploads-*.tar.gz' \) -mtime "+$RETENTION_DAYS" -delete
 
-docker compose exec -T db mysqldump \
-  -u "${DB_USER}" \
-  -p"${DB_PASS}" \
-  --single-transaction \
-  --routines \
-  --triggers \
-  --events \
-  "${DB_NAME}" 2>/dev/null | gzip > "${BACKUP_FILE}"
-
-# Validar que no esté vacío
-if [ ! -s "${BACKUP_FILE}" ]; then
-  rm -f "${BACKUP_FILE}"
-  echo "Error: el backup generado está vacío"
-  exit 1
+# 4) Copia externa opcional
+if [ -n "${BACKUP_REMOTE:-}" ]; then
+  rsync -az --partial "$BACKUP_DIR/" "$BACKUP_REMOTE"
+  echo "[backup] copia remota sincronizada -> $BACKUP_REMOTE"
 fi
 
-echo "✓ Backup creado: ${BACKUP_FILE}"
-echo "  Tamaño: $(du -h "${BACKUP_FILE}" | cut -f1)"
-
-# ── 3. Rotar backups > 30 días ────────────────────────────
-echo "🗑 Limpiando backups con más de 30 días..."
-find "${BACKUP_DIR}" -name 'preoperacional_db_*.sql.gz' -type f -mtime +30 -delete
-
-# ── 4. Subir a S3/compatible (opcional) ──────────────────
-if [ -n "${AWS_S3_BUCKET:-}" ]; then
-  if command -v aws &>/dev/null; then
-    echo "☁ Subiendo a S3://${AWS_S3_BUCKET}..."
-    aws s3 cp "${BACKUP_FILE}" "s3://${AWS_S3_BUCKET}/database/"
-    echo "✓ Subida completada"
-  else
-    echo "⚠ aws CLI no encontrado. Instálalo para subir a S3."
-  fi
-fi
-
-echo ""
-echo "✓ Backup finalizado: $(date)"
+echo "[backup] OK $DATE"

@@ -99,14 +99,13 @@
               <v-icon size="14" class="mr-1">mdi-camera</v-icon>
               Foto del vehículo
             </p>
-            <a :href="uploadUrl(selected.imagenVehiculoUrl)" target="_blank" rel="noopener noreferrer"
+            <a href="#" @click.prevent="openUpload(selected.imagenVehiculoUrl)"
               class="d-inline-block" style="text-decoration:none">
-              <img
-                :src="uploadUrl(selected.imagenVehiculoUrl)"
+              <AuthImg
+                :src="selected.imagenVehiculoUrl"
                 alt="Foto del vehículo"
                 class="answer-img"
                 style="max-width:100%; max-height:240px; display:block;"
-                @error="(e) => ((e.target as HTMLImageElement).style.display = 'none')"
               />
               <span class="img-caption">📷 Ver foto completa</span>
             </a>
@@ -149,13 +148,8 @@
               <!-- Imagen adjunta — solo si existe imagenUrl -->
               <template v-if="answer.imagenUrl" #subtitle>
                 <div class="mt-2">
-                  <a :href="uploadUrl(answer.imagenUrl)" target="_blank" rel="noopener" class="img-link">
-                    <img
-                      :src="uploadUrl(answer.imagenUrl)"
-                      alt="Foto de inspección"
-                      class="answer-img"
-                      @error="(e) => ((e.target as HTMLImageElement).style.display = 'none')"
-                    />
+                  <a href="#" @click.prevent="openUpload(answer.imagenUrl)" class="img-link">
+                    <AuthImg :src="answer.imagenUrl" alt="Foto de inspección" class="answer-img" />
                     <span class="img-caption">📷 Ver foto completa</span>
                   </a>
                 </div>
@@ -173,7 +167,8 @@ import { ref, computed, onMounted } from 'vue'
 import * as XLSX from 'xlsx'
 import { saveAs } from 'file-saver'
 import api from '../api'
-import { uploadUrl } from '../utils/uploadUrl'
+import { openUpload } from '../utils/uploadUrl'
+import AuthImg from '../components/AuthImg.vue'
 
 // ─────────────────────────────────────────────────────────────────
 // TIPOS

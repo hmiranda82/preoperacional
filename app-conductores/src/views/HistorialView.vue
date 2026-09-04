@@ -97,16 +97,14 @@
           <div v-if="selected.imagenVehiculoUrl" class="sv-photo-wrap">
             <p class="sb-label">FOTO DEL VEHÍCULO</p>
             <div class="sv-photo-container">
-              <img
-                :src="uploadUrl(selected.imagenVehiculoUrl)"
+              <AuthImg
+                :src="selected.imagenVehiculoUrl"
                 alt="Foto del vehículo"
                 class="sv-photo-img"
-                @error="(e) => ((e.target as HTMLImageElement).style.display = 'none')"
               />
               <a
-                :href="uploadUrl(selected.imagenVehiculoUrl)"
-                target="_blank"
-                rel="noopener noreferrer"
+                href="#"
+                @click.prevent="openUpload(selected.imagenVehiculoUrl)"
                 class="sv-photo-link"
               >
                 <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
@@ -127,7 +125,7 @@
                   <span class="ai-val" :class="valCls(a.valor)">{{ fmtVal(a.valor) }}</span>
                 </div>
                 <p v-if="a.observacion" class="ai-obs">{{ a.observacion }}</p>
-                <img v-if="a.imagenUrl" :src="uploadUrl(a.imagenUrl)" class="ai-img" alt="Foto"/>
+                <AuthImg v-if="a.imagenUrl" :src="a.imagenUrl" class="ai-img" alt="Foto"/>
               </div>
             </div>
           </div>
@@ -143,7 +141,8 @@ import { computed, onMounted, ref } from 'vue'
 import logoImg from '../assets/Logo.png'
 import { getUserResponses } from '../services/inspection.service'
 import { useAuthStore } from '../stores/auth'
-import { uploadUrl } from '../utils/uploadUrl'
+import { openUpload } from '../utils/uploadUrl'
+import AuthImg from '../components/AuthImg.vue'
 import type { ResponseRecord } from '../types'
 
 const auth = useAuthStore()
