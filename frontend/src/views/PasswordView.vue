@@ -157,11 +157,26 @@ async function submit() {
       current_password: current.value,
       new_password: next.value,
     })
-    // El backend revoca las sesiones anteriores y emite un refresh nuevo para esta
+    // El backend revoca las sesiones anteriores y emite un refresh nuevo para este
+    // dispositivo. Lo intercambiamos por un access token ya liberado (sin cambio
+    // pendiente) para continuar la sesión sin re-login.
     if (res.data?.refresh_token) {
-      auth.refreshToken = res.data.refresh_token
-      sessionStorage.setItem('refresh_token', res.data.refresh_token)
+      try {
+        const { data } = await api.post<{ access_token: string; refresh_token: string }>('/auth/refresh', {
+          refresh_token: res.data.refresh_token,
+        })
+        auth.token = data.access_token
+        auth.refreshToken = data.refresh_token
+        sessionStorage.setItem('token', data.access_token)
+        sessionStorage.setItem('refresh_token', data.refresh_token)
+      } catch {
+        // Cambio aplicado pero sesión no renovable: reautenticar con la nueva clave
+        await auth.logout()
+        router.replace('/login')
+        return
+      }
     }
+    sessionStorage.removeItem('must_change_password')
     done.value = true
     okMsg.value = 'Contraseña actualizada correctamente.'
   } catch (e: any) {

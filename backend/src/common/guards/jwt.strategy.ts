@@ -8,6 +8,8 @@ interface JwtPayload {
   email: string
   role: string
   companyId: number
+  /** mustChangePassword al momento de emitir el token (mcp = must change password). */
+  mcp?: boolean
 }
 
 @Injectable()
@@ -23,6 +25,14 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   validate(payload: JwtPayload) {
-    return { id: payload.sub, email: payload.email, role: payload.role, companyId: payload.companyId ?? 1 }
+    return {
+      id: payload.sub,
+      email: payload.email,
+      role: payload.role,
+      companyId: payload.companyId ?? 1,
+      // Solo el claim del token (emitido tras el login) decide; tras cambiar la
+      // contraseña el cliente obtiene un token nuevo sin el flag (refresh/login).
+      mustChangePassword: payload.mcp === true,
+    }
   }
 }

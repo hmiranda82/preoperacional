@@ -49,7 +49,7 @@ services:
       JWT_EXPIRES_IN: 1h
       PORT: 3002
       NODE_ENV: production
-      RUN_SEED: "false"
+      RUN_SEED: ${RUN_SEED:-false}
       HOST: 0.0.0.0
       API_URL: https://api.${DOMINIO}
       CORS_ORIGINS: https://admin.${DOMINIO},https://localhost

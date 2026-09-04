@@ -9,6 +9,7 @@ import { GenerateResetDto } from './dto/generate-reset.dto'
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
 import { RolesGuard } from '../common/guards/roles.guard'
 import { Roles } from '../common/decorators/roles.decorator'
+import { SkipPasswordChange } from '../common/decorators/skip-password-change.decorator'
 import { CurrentUser } from '../common/decorators/current-user.decorator'
 import type { CurrentUserData } from '../common/decorators/current-user.decorator'
 
@@ -40,6 +41,7 @@ export class AuthController {
   @Post('change-password')
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard)
+  @SkipPasswordChange()
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   changePassword(
     @Body() dto: ChangePasswordDto,
@@ -71,6 +73,7 @@ export class AuthController {
   @Post('logout-all')
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard)
+  @SkipPasswordChange()
   logoutAll(@CurrentUser() user: CurrentUserData) {
     return this.authService.logoutAllSessions(user.id)
   }

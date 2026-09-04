@@ -110,7 +110,12 @@ export class AuthService {
       throw new UnauthorizedException('Usuario inactivo')
     }
 
-    const payload = { sub: user.id, email: user.email, role: user.role, companyId: user.companyId }
+    // El claim mcp (mustChangePassword) viaja en el JWT para que el guard pueda
+    // bloquear la API mientras el usuario no cambie su contraseña temporal.
+    const payload = {
+      sub: user.id, email: user.email, role: user.role, companyId: user.companyId,
+      mcp: user.mustChangePassword === true,
+    }
     const access_token = this.jwtService.sign(payload, { expiresIn: ACCESS_TOKEN_EXPIRY })
     const refresh_token = await this.createSession(user.id)
 
@@ -147,7 +152,10 @@ export class AuthService {
       throw new UnauthorizedException('Usuario inactivo')
     }
 
-    const payload = { sub: user.id, email: user.email, role: user.role, companyId: user.companyId }
+    const payload = {
+      sub: user.id, email: user.email, role: user.role, companyId: user.companyId,
+      mcp: user.mustChangePassword === true,
+    }
     const access_token = this.jwtService.sign(payload, { expiresIn: ACCESS_TOKEN_EXPIRY })
     const refresh_token = await this.createSession(user.id)
 
@@ -196,7 +204,12 @@ export class AuthService {
 
     await this.prisma.session.delete({ where: { id: session.id } })
 
-    const payload = { sub: user.id, email: user.email, role: user.role, companyId: user.companyId }
+    // El token renovado refleja el estado ACTUAL del flag (tras cambiar la
+    // contraseña y hacer refresh, el usuario queda liberado).
+    const payload = {
+      sub: user.id, email: user.email, role: user.role, companyId: user.companyId,
+      mcp: user.mustChangePassword === true,
+    }
     const access_token = this.jwtService.sign(payload, { expiresIn: ACCESS_TOKEN_EXPIRY })
     const new_refresh_token = await this.createSession(user.id)
 
@@ -231,7 +244,13 @@ export class AuthService {
     }
 
     await this.applyNewPassword(user, newPassword, 'CHANGE')
-    return { message: 'Contraseña actualizada correctamente' }
+
+    // Sesión nueva para ESTE dispositivo (las previas quedaron revocadas): los
+    // frontends la intercambian por un access token ya liberado (mcp=false)
+    // para continuar la sesión sin re-login.
+    const refresh_token = await this.createSession(user.id)
+
+    return { message: 'Contraseña actualizada correctamente', refresh_token }
   }
 
   /**

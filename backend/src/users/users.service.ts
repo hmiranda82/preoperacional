@@ -283,7 +283,9 @@ export class UsersService {
         role,
         isActive: dto.isActive ?? true,
         passwordChangedAt: new Date(),
-        mustChangePassword: false,
+        // SEGURIDAD: la contraseña inicial la definió el creador (temporal), no
+        // el propio usuario → se le obliga a cambiarla en su primer inicio.
+        mustChangePassword: true,
         admin:
           role === 'ADMIN'
             ? { create: this.buildAdminData(dto) }

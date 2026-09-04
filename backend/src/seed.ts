@@ -32,13 +32,15 @@ function loadEnvFile(): void {
 
 loadEnvFile()
 
-const prisma = new PrismaClient()
+function isProduction(): boolean {
+  return (process.env.NODE_ENV || 'development') === 'production'
+}
 
-/** Contraseña del ADMIN principal para posibilidades de bootstrap/seed. */
-function getAdminSeedPassword(): string {
+/** Contraseña del ADMIN principal para posibilidades de bootstrap/seed (SOLO desarrollo). */
+export function getAdminSeedPassword(): string {
   const fromEnv = process.env.ADMIN_SEED_PASSWORD
   if (fromEnv && fromEnv.length >= 8) return fromEnv
-  if ((process.env.NODE_ENV || 'development') === 'development') {
+  if (!isProduction()) {
     return 'admin123'
   }
   throw new Error(
@@ -47,25 +49,43 @@ function getAdminSeedPassword(): string {
 }
 
 /** Contraseña de SUPER_ROOT para posibilidades de bootstrap/seed. */
-function getSuperRootPassword(): string {
+export function getSuperRootPassword(): string {
   // En producción/seeding se lee SIEMPRE de variable de entorno (nunca en claro en el código).
   const fromEnv = process.env.SUPER_ROOT_PASSWORD
   if (fromEnv && fromEnv.length >= 8) return fromEnv
 
   // Fallback SOLO para entornos de desarrollo local, para que el seed funcione
   // sin configurar la variable. Nunca se usa en producción.
-  if ((process.env.NODE_ENV || 'development') === 'development') {
+  if (!isProduction()) {
     return 'superRoot2024!'
   }
 
   throw new Error(
-    'SUPER_ROOT_PASSWORD no está definida y NODE_ENV no es development. ' +
+    'SUPER_ROOT_PASSWORD no está definida y NODE_ENV no es production-safe. ' +
     'Defina esta variable de entorno antes de ejecutar el seed.',
   )
 }
 
-async function main() {
-  console.log('Iniciando seed...')
+/**
+ * Seed de la base de datos.
+ *
+ * PRODUCCIÓN (primer arranque del despliegue):
+ *   - Empresa predeterminada
+ *   - ÚNICO usuario: SUPER_ROOT (root@system.local) con contraseña de SUPER_ROOT_PASSWORD
+ *     y mustChangePassword=true → el sistema lo obliga a cambiarla en el primer inicio.
+ *   - Formulario preoperacional con sus 12 preguntas.
+ *   - Los usuarios ADMIN los crea el SUPER_ROOT desde el panel (recibirán una
+ *     contraseña temporal que deberán cambiar al entrar).
+ *
+ * DESARROLLO:
+ *   - Comportamiento histórico: crea también el ADMIN por comodidad local.
+ *
+ * SEGURIDAD: el seed NUNCA reescribe la contraseña de un usuario ya existente,
+ * y NUNCA re-activa el cambio forzado (no encierra al operador en un bucle).
+ */
+export async function runSeed(prisma: PrismaClient): Promise<void> {
+  const production = isProduction()
+  console.log(`Iniciando seed (NODE_ENV=${process.env.NODE_ENV || 'development'})...`)
 
   // ── 0. EMPRESA PREDETERMINADA ───────────────────────────
   const empresa = await prisma.company.upsert({
@@ -75,40 +95,44 @@ async function main() {
   })
   console.log(`✅ Empresa predeterminada: ${empresa.nombre}`)
 
-  // ── 1. ADMIN ─────────────────────────────────────────────
-  const email    = 'admin@preoperacional.com'
-  const password = getAdminSeedPassword()
-  const hash     = await bcrypt.hash(password, 12)
+  // ── 1. ADMIN (solo desarrollo; en producción los crea el SUPER_ROOT) ──
+  if (!production) {
+    const email    = 'admin@preoperacional.com'
+    const password = getAdminSeedPassword()
+    const hash     = await bcrypt.hash(password, 12)
 
-  const existing = await prisma.user.findUnique({
-    where:   { email },
-    include: { admin: true, driver: true },
-  })
+    const existing = await prisma.user.findUnique({
+      where:   { email },
+      include: { admin: true, driver: true },
+    })
 
-  if (existing?.driver) {
-    await prisma.driver.delete({ where: { userId: existing.id } })
-  }
+    if (existing?.driver) {
+      await prisma.driver.delete({ where: { userId: existing.id } })
+    }
 
-  const admin = await prisma.user.upsert({
-    where:  { email },
-    update: {
-      // SEGURIDAD: NO se reescribe la contraseña si el usuario ya existe.
-      // Así el seed nunca resetea credenciales ya establecidas.
-      companyId: 1, role: 'ADMIN', isActive: true,
-      admin: existing?.admin
-        ? { update:  { cedula: '123456789', nombre: 'Administrador Principal', permisos: { usuarios: true, formularios: true, reportes: true } } }
-        : { create:  { cedula: '123456789', nombre: 'Administrador Principal', permisos: { usuarios: true, formularios: true, reportes: true } } },
-    },
-    create: {
-      companyId: 1, email, password: hash, role: 'ADMIN', isActive: true,
-      admin: { create: { cedula: '123456789', nombre: 'Administrador Principal', permisos: { usuarios: true, formularios: true, reportes: true } } },
-    },
-    include: { admin: true },
-  })
+    const admin = await prisma.user.upsert({
+      where:  { email },
+      update: {
+        // SEGURIDAD: NO se reescribe la contraseña si el usuario ya existe.
+        // Así el seed nunca resetea credenciales ya establecidas.
+        companyId: 1, role: 'ADMIN', isActive: true,
+        admin: existing?.admin
+          ? { update:  { cedula: '123456789', nombre: 'Administrador Principal', permisos: { usuarios: true, formularios: true, reportes: true } } }
+          : { create:  { cedula: '123456789', nombre: 'Administrador Principal', permisos: { usuarios: true, formularios: true, reportes: true } } },
+      },
+      create: {
+        companyId: 1, email, password: hash, role: 'ADMIN', isActive: true,
+        admin: { create: { cedula: '123456789', nombre: 'Administrador Principal', permisos: { usuarios: true, formularios: true, reportes: true } } },
+      },
+      include: { admin: true },
+    })
 
     console.log(`✅ Admin listo: ${admin.email}`)
+  } else {
+    console.log('ℹ️  Producción: no se crea ADMIN. Créelos desde el panel con el SUPER_ROOT.')
+  }
 
-  // ── 1b. SUPER_ROOT ─────────────────────────────────────────
+  // ── 1b. SUPER_ROOT (único usuario de producción) ────────
   const superEmail    = 'root@system.local'
   const superPassword = getSuperRootPassword()
   const superHash     = await bcrypt.hash(superPassword, 12)
@@ -116,16 +140,19 @@ async function main() {
   const superRoot = await prisma.user.upsert({
     where:  { email: superEmail },
     update: {
-      // SEGURIDAD: NO se reescribe la contraseña si ya existe (idem admin)
+      // SEGURIDAD: NO se reescribe la contraseña si ya existe (idem admin),
+      // y NO se re-activa mustChangePassword (evita bucle de cambio forzado).
       companyId: 1, role: 'SUPER_ROOT', isActive: true,
     },
     create: {
       companyId: 1, email: superEmail, password: superHash, role: 'SUPER_ROOT', isActive: true,
+      // Primer arranque en producción: el sistema exige cambiarla en el primer login.
+      ...(production ? { mustChangePassword: true } : {}),
     },
     include: { admin: true },
   })
 
-  console.log(`✅ Super Root listo: ${superRoot.email}`)
+  console.log(`✅ Super Root listo: ${superRoot.email}${production ? ' (cambio de contraseña obligatorio al primer inicio)' : ''}`)
 
   // ── 2. FORMULARIO PREOPERACIONAL ─────────────────────────
   const formExiste = await prisma.form.findFirst({
@@ -200,9 +227,13 @@ async function main() {
   }
 
   console.log('\n🚀 Seed completado.')
-  console.log('   Cambia la contraseña del admin después del primer login.')
 }
 
-main()
-  .catch(console.error)
-  .finally(() => prisma.$disconnect())
+// Ejecuta solo cuando se invoca como script (node dist/seed.js),
+// nunca al importarlo (testabilidad).
+if (require.main === module) {
+  const prisma = new PrismaClient()
+  runSeed(prisma)
+    .catch(console.error)
+    .finally(() => prisma.$disconnect())
+}
