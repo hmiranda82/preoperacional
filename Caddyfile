@@ -10,7 +10,7 @@ admin.{$DOMINIO} {
         Referrer-Policy "strict-origin-when-cross-origin"
         Permissions-Policy "camera=(), geolocation=(), microphone=()"
     }
-    reverse_proxy frontend:80
+    reverse_proxy preoperacional-admin:80
 }
 
 api.{$DOMINIO} {
@@ -21,5 +21,5 @@ api.{$DOMINIO} {
         Referrer-Policy "strict-origin-when-cross-origin"
         Permissions-Policy "camera=(), geolocation=(), microphone=()"
     }
-    reverse_proxy backend:3002
+    reverse_proxy preoperacional-api:3002
 }
