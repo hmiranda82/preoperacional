@@ -1,6 +1,5 @@
 {
     email admin@{env.DOMINIO}
-    strict_sni
 }
 
 admin.{env.DOMINIO} {
