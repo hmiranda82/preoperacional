@@ -50,6 +50,7 @@ services:
       PORT: 3002
       NODE_ENV: production
       RUN_SEED: ${RUN_SEED:-false}
+      SUPER_ROOT_PASSWORD: ${SUPER_ROOT_PASSWORD}
       HOST: 0.0.0.0
       API_URL: https://api.${DOMINIO}
       CORS_ORIGINS: https://admin.${DOMINIO},https://localhost
