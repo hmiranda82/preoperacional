@@ -27,7 +27,7 @@ mkdir -p "$BACKUP_DIR"
 # Credenciales leídas del propio contenedor db (MYSQL_USER/MYSQL_PASSWORD
 # vienen del .env vía docker-compose; nunca se escriben en claro aquí).
 docker compose exec -T db sh -c \
-  'exec mysqldump -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" --single-transaction --routines --triggers --events "$MYSQL_DATABASE"' \
+  'exec mysqldump -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" --single-transaction --no-tablespaces --routines --triggers --events "$MYSQL_DATABASE"' \
   | gzip > "$BACKUP_DIR/db-$DATE.sql.gz"
 
 # Validar que el dump no esté vacío (fallar fuerte, no dejar un backup tumba)
