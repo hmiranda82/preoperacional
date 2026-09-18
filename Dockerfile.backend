@@ -35,20 +35,19 @@ RUN set -eux; \
         sleep 5; \
     done; \
     apt-get install -y --no-install-recommends \
-        openssl ca-certificates; \
+        openssl ca-certificates wget; \
     rm -rf /var/lib/apt/lists/*
 
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
 RUN groupadd -r appgroup && useradd -r -g appgroup -m -d /app appuser
 
-WORKDIR /app
+WORKDIR /app/backend
 
-COPY --from=build /app/node_modules ./node_modules
-COPY --from=build /app/backend/dist ./dist
-COPY --from=build /app/backend/prisma ./prisma
+COPY --from=build /app/backend ./
+COPY --from=build /app/node_modules /app/node_modules
 
-RUN mkdir -p /app/uploads && chown -R appuser:appgroup /app
+RUN mkdir -p /app/uploads && chown -R appuser:appgroup /app /app/backend
 
 EXPOSE 3002
 
