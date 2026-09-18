@@ -265,7 +265,7 @@ async function tryLogin() {
   } catch (err: any) {
     const s = err?.response?.status
     errorMsg.value =
-      s === 401 ? 'Credenciales incorrectas. Verifica tu correo y contraseña.'
+      s === 401 ? 'Credenciales incorrectas. Correo o contraseña.'
     : s === 403 ? 'Tu cuenta está inactiva. Contacta al administrador.'
     : 'Error de conexión. Intenta de nuevo.'
     password.value = ''
@@ -341,7 +341,7 @@ async function tryLogin() {
   font-family: 'Barlow', sans-serif;
 }
 .login-topbar {
-  padding: calc(env(safe-area-inset-top) + 14px) 22px 0;
+  padding: calc(env(safe-area-inset-top) + 16px) 22px 0;
 }
 .ltb-brand { display: flex; align-items: center; gap: 8px; }
 .ltb-logo { width: 33px; height: 33px; object-fit: contain; border-radius: 5px; }
@@ -350,17 +350,21 @@ async function tryLogin() {
   font-size: 15px; font-weight: 900; color: #1a2540; letter-spacing: 2px;
 }
 
-.login-hero { display: flex; justify-content: center; padding: 50px 24px 0; }
+.login-hero { display: flex; justify-content: center; padding: 48px 24px 0; }
 /*.hero-wrap {
   width: 210px; height: 210px; background: #0d1422; border-radius: 14px;
   overflow: hidden; box-shadow: 0 8px 32px rgba(0,0,0,.28);
   display: flex; align-items: center; justify-content: center;
 }*/
-.hero-img { width: clamp(200px, 55vw, 280px); height: clamp(190px, 52vw, 270px); object-fit: contain; }
+.hero-img { 
+  width: clamp(160px, 45vw, 220px);
+  height: clamp(150px, 42vw, 210px); 
+  object-fit: contain; 
+}
 
 .login-card {
   background: #fff; border-radius: 20px 20px 0 0;
-  margin-top: 36px; flex: 1;
+  margin-top: 30px; flex: 1;
   padding: 24px 24px calc(24px + env(safe-area-inset-bottom));
   box-shadow: 0 -4px 30px rgba(26,37,64,.08);
 }
@@ -375,7 +379,7 @@ async function tryLogin() {
 .lc-error {
   display: flex; align-items: center; gap: 8px;
   background: #fff5f5; border: 1px solid #fecaca; border-radius: 8px;
-  padding: 10px 13px; font-size: 13px; color: #dc2626; font-weight: 600;
+  padding: 10px 13px; font-size: 13px; color: #dc2626; font-weight: 450;
   margin-bottom: 20px;
   overflow: hidden;
   max-height: 80px;

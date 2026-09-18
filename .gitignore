@@ -11,7 +11,16 @@ coverage
 !.env.production.example
 *.pem
 *.key
+*.jks
+*.keystore
+*.pfx
+*.p12
 keystore.properties
+*.mobileprovision
+
+# APKs y paquetes firmados de la app (binarios; URL embebida no se versiona)
+*.apk
+*.aab
 
 # Bases de datos y dumps (.sql) — excepto migraciones de Prisma (versionadas)
 Base de Datos/
