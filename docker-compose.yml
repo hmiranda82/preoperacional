@@ -75,7 +75,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        VITE_API_URL: https://api.${DOMINIO}
+        VITE_API_URL: https://api.${DOMINIO}/api
     container_name: preoperacional-admin
     restart: unless-stopped
     networks:
