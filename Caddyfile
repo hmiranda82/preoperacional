@@ -1,8 +1,8 @@
 {
-    email admin@{env.DOMINIO}
+    email admin@{$DOMINIO}
 }
 
-admin.{env.DOMINIO} {
+admin.{$DOMINIO} {
     header {
         Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
         X-Frame-Options "DENY"
@@ -13,7 +13,7 @@ admin.{env.DOMINIO} {
     reverse_proxy frontend:80
 }
 
-api.{env.DOMINIO} {
+api.{$DOMINIO} {
     header {
         Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
         X-Frame-Options "DENY"
