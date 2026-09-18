@@ -2,7 +2,7 @@
 set -e
 
 echo "Running database migrations..."
-npx prisma migrate deploy
+npx prisma@5.22.0 migrate deploy
 echo "Migrations complete."
 
 # Seed controlado: SOLO se ejecuta si RUN_SEED=true.
