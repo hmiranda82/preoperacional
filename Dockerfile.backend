@@ -1,8 +1,14 @@
 FROM node:20-slim AS build
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    openssl ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
+RUN set -eux; \
+    for i in 1 2 3 4 5; do \
+        apt-get -o Acquire::ForceIPv4=true update && break; \
+        echo "apt-get update failed, retry $i"; \
+        sleep 5; \
+    done; \
+    apt-get install -y --no-install-recommends \
+        openssl ca-certificates; \
+    rm -rf /var/lib/apt/lists/*
 
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
@@ -22,9 +28,15 @@ RUN pnpm --filter backend build
 
 FROM node:20-slim
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    openssl ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
+RUN set -eux; \
+    for i in 1 2 3 4 5; do \
+        apt-get -o Acquire::ForceIPv4=true update && break; \
+        echo "apt-get update failed, retry $i"; \
+        sleep 5; \
+    done; \
+    apt-get install -y --no-install-recommends \
+        openssl ca-certificates; \
+    rm -rf /var/lib/apt/lists/*
 
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
