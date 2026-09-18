@@ -12,7 +12,7 @@ const config: CapacitorConfig = {
   },
     android: {
       backgroundColor: '#F2F3F4',
-      allowMixedContent: true,
+      allowMixedContent: false,
     },
   ios: {
     scheme: 'Revision',
