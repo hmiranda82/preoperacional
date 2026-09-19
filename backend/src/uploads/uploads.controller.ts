@@ -132,8 +132,10 @@ export class UploadsController {
     }
 
     // Convierte a JPEG (compatible con Caddy, WebView Android e iOS) con
-    // redimensionado a IMAGE_MAX_DIMENSION y calidad IMAGE_QUALITY. Devuelve un
-    // archivo nuevo (.jpg) y elimina el original (PNG/HEIC/WebP pesan más).
+    // redimensionado a IMAGE_MAX_DIMENSION y calidad IMAGE_QUALITY. Si el
+    // procesamiento falla, se conserva el archivo original (la subida nunca
+    // debe bloquearse por la compresión).
+    let finalPath = file.path
     const outPath = `${file.path.replace(/\.[^.]+$/, '')}.jpg`
     try {
       await sharp(file.path, { failOn: 'none' })
@@ -145,12 +147,14 @@ export class UploadsController {
         .jpeg({ quality: IMAGE_QUALITY, progressive: true })
         .toFile(outPath)
       unlinkSync(file.path)
-    } catch {
-      unlinkSync(file.path)
-      throw new InternalServerErrorException('No se pudo procesar la imagen')
+      finalPath = outPath
+    } catch (err) {
+      if (!/no se pudo procesar|No se pudo/i.test(String(err))) {
+        console.error('[uploads] sharp falló — se conserva la imagen original:', err)
+      }
     }
 
-    const filename = basename(outPath)
+    const filename = basename(finalPath)
     const baseUrl = (process.env.API_URL || 'http://localhost:3000').replace(/\/+$/, '')
     return {
       url: `${baseUrl}/api/uploads/${filename}`,
