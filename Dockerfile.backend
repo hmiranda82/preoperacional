@@ -1,4 +1,4 @@
-FROM node:20-slim AS build
+FROM node:22-slim AS build
 
 RUN set -eux; \
     for i in 1 2 3 4 5; do \
@@ -26,7 +26,7 @@ COPY backend/src ./backend/src
 
 RUN pnpm --filter backend build
 
-FROM node:20-slim
+FROM node:22-slim
 
 RUN set -eux; \
     for i in 1 2 3 4 5; do \
