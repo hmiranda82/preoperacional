@@ -104,7 +104,7 @@
               />
               <a
                 href="#"
-                @click.prevent="openUpload(selected.imagenVehiculoUrl)"
+                @click.prevent="openImageViewer(selected.imagenVehiculoUrl)"
                 class="sv-photo-link"
               >
                 <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
@@ -133,6 +133,24 @@
       </div>
     </Transition>
 
+  <!-- Image viewer -->
+    <Transition name="viewer-t">
+      <div v-if="viewerOpen" class="viewer-overlay" @click.self="closeViewer">
+        <div class="viewer-top">
+          <button class="viewer-close" @click="closeViewer">
+            <svg width="22" height="22" viewBox="0 0 18 18" fill="none"><path d="M4 4l10 10M14 4L4 14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          </button>
+        </div>
+        <div class="viewer-stage">
+          <img v-if="viewerUrl" :src="viewerUrl" alt="Foto ampliada" class="viewer-img" />
+          <div v-else class="viewer-empty">
+            <div class="spinner"></div>
+            <p>CARGANDO FOTO...</p>
+          </div>
+        </div>
+      </div>
+    </Transition>
+
   </div>
 </template>
 
@@ -141,7 +159,7 @@ import { computed, onMounted, ref } from 'vue'
 import logoImg from '../assets/Logo.png'
 import { getUserResponses } from '../services/inspection.service'
 import { useAuthStore } from '../stores/auth'
-import { openUpload } from '../utils/uploadUrl'
+import { fetchUploadBlobUrl } from '../utils/uploadUrl'
 import AuthImg from '../components/AuthImg.vue'
 import type { ResponseRecord } from '../types'
 
@@ -151,6 +169,9 @@ const loading = ref(false)
 const loadError = ref('')
 const sheet = ref(false)
 const selected = ref<ResponseRecord | null>(null)
+const viewerOpen = ref(false)
+const viewerUrl = ref('')
+let viewerSeq = 0
 
 const hasBad = (response: ResponseRecord) =>
   response.answers.some((answer) => answer.valor === 'NO' || answer.valor === 'false')
@@ -193,6 +214,27 @@ function valCls(value: string) {
 function openDetail(response: ResponseRecord) {
   selected.value = response
   sheet.value = true
+}
+
+async function openImageViewer(src: string | null | undefined) {
+  viewerOpen.value = true
+  viewerUrl.value = ''
+  const mySeq = ++viewerSeq
+  const loaded = await fetchUploadBlobUrl(src)
+  if (mySeq !== viewerSeq || !viewerOpen.value) {
+    if (loaded) URL.revokeObjectURL(loaded)
+    return
+  }
+  viewerUrl.value = loaded
+}
+
+function closeViewer() {
+  viewerOpen.value = false
+  viewerSeq++
+  if (viewerUrl.value) {
+    URL.revokeObjectURL(viewerUrl.value)
+    viewerUrl.value = ''
+  }
 }
 
 async function load() {
@@ -289,5 +331,24 @@ onMounted(() => {
   letter-spacing: .8px; text-decoration: none;
 }
 .sv-photo-link:hover { background: rgba(26,37,64,.95); }
+
+/* ── Visor de foto completa (dentro de la app) ── */
+.viewer-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.92); z-index: 400; display: flex; flex-direction: column; }
+.viewer-top { display: flex; justify-content: flex-end; padding: calc(env(safe-area-inset-top) + 12px) 14px 0; flex-shrink: 0; }
+.viewer-close {
+  width: 40px; height: 40px; border-radius: 50%;
+  background: rgba(255,255,255,.16); border: none; color: #fff;
+  display: flex; align-items: center; justify-content: center; cursor: pointer;
+}
+.viewer-close:active { background: rgba(255,255,255,.3); }
+.viewer-stage { flex: 1; display: flex; align-items: center; justify-content: center; padding: 14px 18px calc(env(safe-area-inset-bottom) + 18px); min-height: 0; }
+.viewer-img {
+  max-width: 100%; max-height: 100%; width: auto; height: auto;
+  object-fit: contain; border-radius: 8px; box-shadow: 0 8px 40px rgba(0,0,0,.5);
+}
+.viewer-empty { display: flex; flex-direction: column; align-items: center; gap: 14px; color: #fff; font-family: 'Barlow Condensed', sans-serif; font-size: 13px; letter-spacing: 1.5px; }
+.viewer-t-enter-active { animation: viewerIn .22s ease; }
+.viewer-t-leave-active { animation: viewerIn .18s ease reverse; }
+@keyframes viewerIn { from { opacity: 0; } to { opacity: 1; } }
 
 </style>
