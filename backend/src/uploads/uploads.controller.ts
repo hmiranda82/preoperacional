@@ -14,13 +14,19 @@ import {
 import type { Response } from 'express'
 import { FileInterceptor } from '@nestjs/platform-express'
 import { diskStorage } from 'multer'
-import { extname, join } from 'path'
+import { extname, join, basename } from 'path'
 import { randomUUID } from 'crypto'
 import { existsSync, mkdirSync, unlinkSync, readFileSync } from 'fs'
+import sharp from 'sharp'
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
 import { QueryTokenAuthGuard } from './uploads.auth.guard'
 
 const UPLOADS_DIR = join(process.cwd(), 'uploads')
+
+// Compresión/redimensionado al subir: evita que fotos de celular (5-10 MB)
+// llenen el disco. Configurable por env con defaults seguros.
+const IMAGE_MAX_DIMENSION = Number(process.env.IMAGE_MAX_DIMENSION ?? 1920)
+const IMAGE_QUALITY = Number(process.env.IMAGE_QUALITY ?? 80)
 
 // Ensure uploads directory exists
 if (!existsSync(UPLOADS_DIR)) {
@@ -111,7 +117,7 @@ export class UploadsController {
       },
     }),
   )
-  uploadImage(@UploadedFile() file: Express.Multer.File) {
+  async uploadImage(@UploadedFile() file: Express.Multer.File) {
     if (!file) throw new BadRequestException('No se recibió ningún archivo')
 
     if (!file.path || !existsSync(file.path)) {
@@ -123,10 +129,30 @@ export class UploadsController {
       throw new BadRequestException('El archivo no es una imagen válida')
     }
 
+    // Convierte a JPEG (compatible con Caddy, WebView Android e iOS) con
+    // redimensionado a IMAGE_MAX_DIMENSION y calidad IMAGE_QUALITY. Devuelve un
+    // archivo nuevo (.jpg) y elimina el original (PNG/HEIC/WebP pesan más).
+    const outPath = `${file.path.replace(/\.[^.]+$/, '')}.jpg`
+    try {
+      await sharp(file.path, { failOn: 'none' })
+        .rotate()
+        .resize(IMAGE_MAX_DIMENSION, IMAGE_MAX_DIMENSION, {
+          fit: 'inside',
+          withoutEnlargement: true,
+        })
+        .jpeg({ quality: IMAGE_QUALITY, progressive: true })
+        .toFile(outPath)
+      unlinkSync(file.path)
+    } catch {
+      unlinkSync(file.path)
+      throw new InternalServerErrorException('No se pudo procesar la imagen')
+    }
+
+    const filename = basename(outPath)
     const baseUrl = (process.env.API_URL || 'http://localhost:3000').replace(/\/+$/, '')
     return {
-      url: `${baseUrl}/api/uploads/${file.filename}`,
-      filename: file.filename,
+      url: `${baseUrl}/api/uploads/${filename}`,
+      filename,
     }
   }
 }

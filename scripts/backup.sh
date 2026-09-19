@@ -9,7 +9,7 @@
 #
 # Variables opcionales:
 #   BACKUP_DIR       destino local (default ./backups; en VPS usar /var/backups/preoperacional)
-#   RETENTION_DAYS   días de retención (default 30)
+#   RETENTION_DAYS   días de retención (default 14)
 #   BACKUP_REMOTE    destino rsync remoto (ej: user@backup-host:/backups/preoperacional/)
 #                    — el backup NUNCA debe vivir solo en el VPS
 # ─────────────────────────────────────────────────────────────
@@ -18,7 +18,7 @@ set -eu
 cd "$(dirname "$0")/.."
 
 BACKUP_DIR="${BACKUP_DIR:-./backups}"
-RETENTION_DAYS="${RETENTION_DAYS:-30}"
+RETENTION_DAYS="${RETENTION_DAYS:-14}"
 DATE="$(date +%Y%m%d-%H%M%S)"
 
 mkdir -p "$BACKUP_DIR"
