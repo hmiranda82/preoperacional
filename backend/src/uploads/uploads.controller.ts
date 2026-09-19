@@ -16,7 +16,7 @@ import { FileInterceptor } from '@nestjs/platform-express'
 import { diskStorage } from 'multer'
 import { extname, join, basename } from 'path'
 import { randomUUID } from 'crypto'
-import { existsSync, mkdirSync, unlinkSync, readFileSync } from 'fs'
+import { existsSync, mkdirSync, unlinkSync, readFileSync, renameSync } from 'fs'
 import sharp from 'sharp'
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
 import { QueryTokenAuthGuard } from './uploads.auth.guard'
@@ -137,6 +137,9 @@ export class UploadsController {
     // debe bloquearse por la compresión).
     let finalPath = file.path
     const outPath = `${file.path.replace(/\.[^.]+$/, '')}.jpg`
+    // Ruta temporal SIEMPRE distinta del original: si la app ya sube .jpg,
+    // outPath coincide con file.path y sharp lanza "same file for input/output".
+    const tmpPath = `${file.path}.tmp.jpg`
     try {
       await sharp(file.path, { failOn: 'none' })
         .rotate()
@@ -145,10 +148,12 @@ export class UploadsController {
           withoutEnlargement: true,
         })
         .jpeg({ quality: IMAGE_QUALITY, progressive: true })
-        .toFile(outPath)
+        .toFile(tmpPath)
       unlinkSync(file.path)
+      renameSync(tmpPath, outPath)
       finalPath = outPath
     } catch (err) {
+      if (existsSync(tmpPath)) unlinkSync(tmpPath)
       if (!/no se pudo procesar|No se pudo/i.test(String(err))) {
         console.error('[uploads] sharp falló — se conserva la imagen original:', err)
       }
