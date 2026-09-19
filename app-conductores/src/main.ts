@@ -3,11 +3,8 @@ import { createPinia } from 'pinia'
 import { Capacitor } from '@capacitor/core'
 import App from './App.vue'
 import router from './router'
-import { initTheme } from './theme'
 
 try {
-  initTheme()
-
   const app = createApp(App)
 
   // Captura errores de Vue y los muestra en pantalla en lugar de página en blanco

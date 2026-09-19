@@ -36,9 +36,6 @@ importers:
       '@capacitor/core':
         specifier: ^8.3.0
         version: 8.3.4
-      '@capacitor/status-bar':
-        specifier: 8.0.0
-        version: 8.0.0(@capacitor/core@8.3.4)
       '@mdi/font':
         specifier: ^7.4.47
         version: 7.4.47
@@ -579,11 +576,6 @@ packages:
     resolution: {integrity: sha512-XvvnPFWWP/gwwO811ue7nEBKSZqDCIB8hxGgWV6iXA7DSVLqMOEmQdfHj94kkVxof2wL9XWHypu3ayDULo7U5w==}
     peerDependencies:
       '@capacitor/core': ^8.3.0
-
-  '@capacitor/status-bar@8.0.0':
-    resolution: {integrity: sha512-aIj3bc7z8lfPgOen8HlrBrkfnxpFnh21OCx6jCUx4Mvv+B6eEkUQ49b32DOddgVfr+igRHLX2SYi7duqIsNDXg==}
-    peerDependencies:
-      '@capacitor/core': '>=8.0.0'
 
   '@colors/colors@1.5.0':
     resolution: {integrity: sha512-ooWCrlZP11i8GImSjTHYHLkvFDP48nS4+204nGb1RiX/WXYHmJA2III9/e2DWVabCESdW7hBAEzHRqUn9OUVvQ==}
@@ -5901,10 +5893,6 @@ snapshots:
       tslib: 2.8.1
 
   '@capacitor/ios@8.3.4(@capacitor/core@8.3.4)':
-    dependencies:
-      '@capacitor/core': 8.3.4
-
-  '@capacitor/status-bar@8.0.0(@capacitor/core@8.3.4)':
     dependencies:
       '@capacitor/core': 8.3.4
 
