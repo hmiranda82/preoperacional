@@ -56,6 +56,7 @@ services:
       CORS_ORIGINS: https://admin.${DOMINIO},https://localhost
       LOG_LEVEL: info
       TRUST_PROXY: "1"
+      UPLOADS_DIR: /app/uploads
       SENTRY_DSN: ${SENTRY_DSN:-}
     volumes:
       - uploads:/app/uploads

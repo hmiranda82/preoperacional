@@ -21,7 +21,9 @@ import sharp from 'sharp'
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
 import { QueryTokenAuthGuard } from './uploads.auth.guard'
 
-const UPLOADS_DIR = join(process.cwd(), 'uploads')
+// Las fotos viven en un volumen Docker persistente (montado en /app/uploads).
+// Fallback a ./uploads para desarrollo local (cwd).
+const UPLOADS_DIR = process.env.UPLOADS_DIR || join(process.cwd(), 'uploads')
 
 // Compresión/redimensionado al subir: evita que fotos de celular (5-10 MB)
 // llenen el disco. Configurable por env con defaults seguros.
