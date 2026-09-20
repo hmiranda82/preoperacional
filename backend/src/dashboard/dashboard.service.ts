@@ -15,6 +15,19 @@ import { PrismaService } from '../prisma/prisma.service'
 const DIAS_PROXIMO = 10
 const BAD_VALUES = ['NO', 'MALO', 'false']
 
+/**
+ * true si `dateStr` (YYYY-MM-DD, zona Colombia) es día laboral según
+ * `diasLaborales` (lista "0-6" separada por comas; 0=Domingo … 6=Sábado,
+ * igual a Date.getDay()). Misma semántica que ReportsService.
+ * Cadena vacía = sin días laborales.
+ */
+export function esDiaLaboral(diasLaborales: string, dateStr: string): boolean {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  if (!y || !m || !d) return false
+  const weekday = new Date(y, m - 1, d).getDay()
+  return diasLaborales.split(',').filter(Boolean).map(Number).includes(weekday)
+}
+
 @Injectable()
 export class DashboardService {
   constructor(private prisma: PrismaService) {}
@@ -90,6 +103,7 @@ export class DashboardService {
       lastGroups,       // última revisión por driver (agregación pesada)
       recent,           // 8 respuestas más recientes de hoy
       badAnswers,       // SOLO respuestas con novedad (query liviana)
+      ausDays,          // conductores con ausencia registrada HOY
     ] = await Promise.all([
       this.prisma.user.findMany({
         where: { role: 'DRIVER', isActive: true, ...(companyId ? { companyId } : {}) },
@@ -98,6 +112,7 @@ export class DashboardService {
             select: {
               id: true, nombre: true, placa: true,
               soatVigencia: true, tecniVigencia: true,
+              diasLaborales: true,
               user: { select: { id: true } },
             },
           },
@@ -152,6 +167,14 @@ export class DashboardService {
           },
         },
       }),
+      this.prisma.ausencia.findMany({
+        where: {
+          activo: true,
+          fecha: new Date(this.todayCol()),
+          driver: { user: { role: 'DRIVER', ...(companyId ? { companyId } : {}) } },
+        },
+        select: { driverId: true },
+      }),
     ])
 
     // ── Mapeos base ────────────────────────────────────────────
@@ -164,20 +187,34 @@ export class DashboardService {
         nombre: d.driver!.nombre,
         soatVigencia: d.driver!.soatVigencia ?? null,
         tecniVigencia: d.driver!.tecniVigencia ?? null,
+        diasLaborales: d.driver!.diasLaborales ?? '1,2,3,4,5',
       }))
 
     const onVacation = new Set(vacDays.map(v => v.driverId))
+    const onAusencia = new Set(ausDays.map(a => a.driverId))
     const operative = activeRows.filter(r => !onVacation.has(r.driverId))
-    const totalActiveConductors = operative.length
     const totalVacationCount = onVacation.size
 
-    // ── KPIs ho-y ──────────────────────────────────────────────
+    // ── KPIs hoy ──────────────────────────────────────────────
     const submittedTodayIds = new Set<number>()
     respToday.forEach(r => {
       if (r.driver?.userId != null) submittedTodayIds.add(r.driver.userId)
     })
     const todayCount = respToday.length
-    const pendingCount = operative.filter(r => !submittedTodayIds.has(r.userId)).length
+
+    // Rinde cuentas HOY = activo + sin vacaciones + sin ausencia registrada +
+    // con hoy DENTRO de su jornada (diasLaborales). Los conductores en
+    // descanso, ausentes o de vacaciones NO se cuentan como pendientes ni
+    // generan alerta de inspección faltante.
+    const conJornadaHoy = operative.filter(
+      r => !onAusencia.has(r.driverId) && esDiaLaboral(r.diasLaborales, this.todayCol()),
+    )
+    const owedSubmitted = conJornadaHoy.filter(r => submittedTodayIds.has(r.userId)).length
+    const totalActiveConductors = conJornadaHoy.length
+    const pendingCount = totalActiveConductors - owedSubmitted
+    const cumplPct = totalActiveConductors
+      ? Math.round((owedSubmitted / totalActiveConductors) * 100)
+      : 0
 
     const novedadUserIds = new Set<number>()
     const novedadResponseIds = new Set<number>()
@@ -187,8 +224,6 @@ export class DashboardService {
       else if (a.response?.id != null) novedadResponseIds.add(a.response.id)
     })
     const conductoresConNovedad = novedadUserIds.size + novedadResponseIds.size
-
-    const cumplPct = totalActiveConductors ? Math.round((todayCount / totalActiveConductors) * 100) : 0
 
     // ── Última revisión por usuario ─────────────────────────────
     const lastRevision: Record<number, string> = {}
@@ -286,7 +321,7 @@ export class DashboardService {
       }
     })
 
-    operative
+    conJornadaHoy
       .filter(r => !submittedTodayIds.has(r.userId))
       .slice(0, 5)
       .forEach(r => {
