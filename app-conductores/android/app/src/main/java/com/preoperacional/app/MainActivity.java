@@ -3,6 +3,7 @@ package com.preoperacional.app;
 import android.content.res.Configuration;
 import android.graphics.Color;
 import android.os.Bundle;
+import android.view.View;
 
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
@@ -17,7 +18,14 @@ public class MainActivity extends BridgeActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        applyStatusBarTheme();
+        // Aplicar solo cuando la vista esté adjunta a la ventana; de lo contrario
+        // WindowCompat.getInsetsController puede fallar en algunos dispositivos.
+        final View decor = getWindow().getDecorView();
+        if (decor.isAttachedToWindow()) {
+            applyStatusBarTheme();
+        } else {
+            decor.post(() -> applyStatusBarTheme());
+        }
     }
 
     @Override
@@ -44,7 +52,9 @@ public class MainActivity extends BridgeActivity {
         getWindow().setStatusBarColor(dark ? STATUS_BAR_DARK : STATUS_BAR_LIGHT);
         WindowInsetsControllerCompat controller =
                 WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView());
-        controller.setAppearanceLightStatusBars(!dark);
+        if (controller != null) {
+            controller.setAppearanceLightStatusBars(!dark);
+        }
     }
 
     private boolean isNightMode() {
